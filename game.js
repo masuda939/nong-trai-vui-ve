@@ -1516,5 +1516,7 @@ window.__farm = {
   get fishMeshes() { return fishMeshes; },
   get animalMeshes() { return animalMeshes; },
   get decorMeshes() { return decorMeshes; },
+  get facing() { return facing; },
+  set facing(v) { facing = v; },
   renderFrame,
 };
