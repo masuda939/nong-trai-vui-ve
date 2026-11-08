@@ -905,6 +905,7 @@ window.__farm = {
   get player() { return playerGroup; },
   get camera() { return camera; },
   renderOnce() { renderer.render(scene, camera); },
+  renderFrame,
 };
 
 /* Âm thanh nhỏ bằng WebAudio */
