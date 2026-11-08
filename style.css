@@ -44,6 +44,14 @@ body {
 }
 .auth-form input:focus { border-color: #7ec850; }
 .auth-error { color: #ff8f8f; font-size: 13px; min-height: 18px; }
+.gender-pick { display: flex; align-items: center; gap: 8px; margin-bottom: 2px; }
+.gender-label { font-size: 13px; color: #cfc7b8; }
+.gender-btn {
+  flex: 1; padding: 10px; border-radius: 10px; border: 1px solid #5a5245;
+  background: transparent; color: #ddd; font-weight: 700; cursor: pointer; font-size: 14px;
+}
+.gender-btn.active { background: #f78fb3; border-color: #f78fb3; color: #3a1020; }
+.gender-btn.active.male-active { background: #6fb1e8; border-color: #6fb1e8; color: #10243a; }
 .cloud-status { margin-top: 14px; font-size: 12px; color: #9fd48a; }
 
 /* ===== Buttons ===== */

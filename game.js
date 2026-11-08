@@ -87,7 +87,7 @@ function freshState() {
   return {
     v: 2, gold: START_GOLD, level: 1, xp: 0, day: 1, energy: 100,
     inv: { seed_turnip: 6 }, tiles: {}, px: 8 * TILE, py: 8 * TILE,
-    fish: [], animals: [], decor: {},
+    fish: [], animals: [], decor: {}, gender: "female",
   };
 }
 const xpNeed = (lv) => lv * 50;
@@ -138,6 +138,17 @@ function initSupabase() {
 function authScreenVisible() { return !$("auth-screen").classList.contains("hidden"); }
 
 let authMode = "login";
+let chosenGender = localStorage.getItem("farm_gender") || "female";
+function setGender(g) {
+  chosenGender = g;
+  try { localStorage.setItem("farm_gender", g); } catch (_) {}
+  $("pick-female").classList.toggle("active", g === "female");
+  $("pick-male").classList.toggle("active", g === "male");
+  $("pick-male").classList.toggle("male-active", g === "male");
+}
+$("pick-male").onclick = () => setGender("male");
+$("pick-female").onclick = () => setGender("female");
+setGender(chosenGender);
 function setAuthMode(m) {
   authMode = m;
   $("tab-login").classList.toggle("active", m === "login");
@@ -205,6 +216,7 @@ function migrate(st) {
   m.fish = Array.isArray(st.fish) ? st.fish : [];
   m.animals = Array.isArray(st.animals) ? st.animals : [];
   m.decor = st.decor && typeof st.decor === "object" ? st.decor : {};
+  m.gender = st.gender === "male" ? "male" : "female";
   m.v = 2;
   return m;
 }
@@ -276,13 +288,6 @@ function initThree() {
   dirLight.shadow.camera.left = -40; dirLight.shadow.camera.right = 40;
   dirLight.shadow.camera.top = 40; dirLight.shadow.camera.bottom = -40;
   scene.add(dirLight);
-
-  buildGround();
-  buildHouse();
-  buildShop();
-  buildCoop();
-  buildPlayer();
-  buildHighlight();
 
   onResize();
   window.addEventListener("resize", onResize);
@@ -431,26 +436,106 @@ function buildCoop() {
   scene.add(g);
 }
 
-function buildPlayer() {
+let playerShadow = null;
+function buildPlayer(gender = "female") {
+  // Xoá nhân vật cũ nếu có
+  if (playerGroup) {
+    scene.remove(playerGroup);
+    playerGroup.traverse?.((o) => { o.geometry?.dispose(); o.material?.dispose?.(); });
+  }
   const g = new THREE.Group();
-  const body = new THREE.Mesh(new THREE.BoxGeometry(0.8, 1.0, 0.5), mat(0xe04b3a));
-  body.position.y = 1.05; body.castShadow = true;
-  g.add(body);
-  const legL = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.55, 0.3), mat(0x3a5a8a));
-  legL.position.set(-0.2, 0.28, 0); legL.castShadow = true;
-  const legR = legL.clone(); legR.position.x = 0.2;
+  const M = mat;
+  const female = gender === "female";
+
+  // Chân: khớp xoay ở hông
+  const legPivot = (x, color) => {
+    const p = new THREE.Group();
+    p.position.set(x, 0.58, 0);
+    const leg = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.58, 0.28), M(color));
+    leg.position.y = -0.29; leg.castShadow = true;
+    p.add(leg);
+    return p;
+  };
+  const legL = legPivot(-0.19, female ? 0xf0c8a0 : 0x3a5a8a);
+  const legR = legPivot(0.19, female ? 0xf0c8a0 : 0x3a5a8a);
   g.add(legL, legR);
   g.userData.legs = [legL, legR];
-  const head = new THREE.Mesh(new THREE.SphereGeometry(0.42, 16, 12), mat(0xf0c8a0));
+
+  // Tay: khớp xoay ở vai
+  const armPivot = (x, color) => {
+    const p = new THREE.Group();
+    p.position.set(x, 1.42, 0);
+    const arm = new THREE.Mesh(new THREE.BoxGeometry(0.17, 0.58, 0.2), M(color));
+    arm.position.y = -0.31; arm.castShadow = true;
+    const hand = new THREE.Mesh(new THREE.SphereGeometry(0.11, 8, 6), M(0xf0c8a0));
+    hand.position.y = -0.62;
+    p.add(arm, hand);
+    return p;
+  };
+  let armL, armR;
+
+  if (female) {
+    // 👧 Nữ: váy hồng xòe + tay áo ngắn
+    const dress = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.6, 1.05, 10), M(0xff8fb5));
+    dress.position.y = 1.0; dress.castShadow = true;
+    g.add(dress);
+    const ribbon = new THREE.Mesh(new THREE.TorusGeometry(0.25, 0.045, 6, 16), M(0xffffff));
+    ribbon.rotation.x = Math.PI / 2; ribbon.position.y = 1.52;
+    g.add(ribbon);
+    armL = armPivot(-0.4, 0xff8fb5); armR = armPivot(0.4, 0xff8fb5);
+  } else {
+    // 👦 Nam: áo đỏ + mũ nông dân
+    const body = new THREE.Mesh(new THREE.BoxGeometry(0.8, 1.0, 0.5), M(0xe04b3a));
+    body.position.y = 1.05; body.castShadow = true;
+    g.add(body);
+    armL = armPivot(-0.5, 0xe04b3a); armR = armPivot(0.5, 0xe04b3a);
+  }
+  g.add(armL, armR);
+  g.userData.arms = [armL, armR];
+
+  // Đầu chung
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.42, 16, 12), M(0xf5d0b0));
   head.position.y = 1.95; head.castShadow = true;
   g.add(head);
-  const brim = new THREE.Mesh(new THREE.CylinderGeometry(0.62, 0.62, 0.08, 16), mat(0xf5c542));
-  brim.position.y = 2.22;
-  const top = new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.36, 0.3, 16), mat(0xf5c542));
-  top.position.y = 2.38;
-  g.add(brim, top);
+  // Mắt + má hồng (nữ)
+  const eyeL = new THREE.Mesh(new THREE.SphereGeometry(0.05, 6, 6), M(0x30302f));
+  eyeL.position.set(-0.14, 2.0, 0.38);
+  const eyeR = eyeL.clone(); eyeR.position.x = 0.14;
+  g.add(eyeL, eyeR);
+  if (female) {
+    const cheekL = new THREE.Mesh(new THREE.SphereGeometry(0.07, 6, 6), M(0xffb3c1));
+    cheekL.position.set(-0.24, 1.88, 0.34); cheekL.scale.set(1, 0.6, 0.5);
+    const cheekR = cheekL.clone(); cheekR.position.x = 0.24;
+    g.add(cheekL, cheekR);
+    // Tóc + hai đuôi sam + nơ
+    const hairCap = new THREE.Mesh(new THREE.SphereGeometry(0.45, 16, 12, 0, Math.PI * 2, 0, Math.PI / 2), M(0x6b4423));
+    hairCap.position.y = 1.97;
+    const pigL = new THREE.Mesh(new THREE.SphereGeometry(0.16, 10, 8), M(0x6b4423));
+    pigL.position.set(-0.46, 1.78, -0.02); pigL.scale.set(1, 1.9, 1); pigL.castShadow = true;
+    const pigR = pigL.clone(); pigR.position.x = 0.46;
+    const bowL = new THREE.Mesh(new THREE.SphereGeometry(0.08, 6, 5), M(0xe04b7a));
+    bowL.position.set(-0.46, 1.96, -0.02);
+    const bowR = bowL.clone(); bowR.position.x = 0.46;
+    g.add(hairCap, pigL, pigR, bowL, bowR);
+  } else {
+    const brim = new THREE.Mesh(new THREE.CylinderGeometry(0.62, 0.62, 0.08, 16), M(0xf5c542));
+    brim.position.y = 2.22;
+    const top = new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.36, 0.3, 16), M(0xf5c542));
+    top.position.y = 2.38;
+    g.add(brim, top);
+  }
+
   playerGroup = g;
   scene.add(g);
+
+  // Bóng đổ mềm dưới chân
+  if (playerShadow) scene.remove(playerShadow);
+  playerShadow = new THREE.Mesh(
+    new THREE.CircleGeometry(0.62, 20),
+    new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.3, depthWrite: false })
+  );
+  playerShadow.rotation.x = -Math.PI / 2;
+  scene.add(playerShadow);
 }
 
 function buildHighlight() {
@@ -1413,15 +1498,19 @@ function renderFrame(t = performance.now() / 1000) {
   const px = w2x(S.px), pz = w2z(S.py);
   playerGroup.position.set(px, 0, pz);
   playerGroup.rotation.y = Math.atan2(facing.dx, facing.dy);
+  if (playerShadow) playerShadow.position.set(px, 0.02, pz);
 
+  const legs = playerGroup.userData.legs, arms = playerGroup.userData.arms;
   if (playerGroup.userData.moving) {
-    const sw = Math.sin(t * 10) * 0.5;
-    playerGroup.userData.legs[0].rotation.x = sw;
-    playerGroup.userData.legs[1].rotation.x = -sw;
+    const sw = Math.sin(t * 10) * 0.55;
+    legs[0].rotation.x = sw;  legs[1].rotation.x = -sw;
+    arms[0].rotation.x = -sw * 0.8; arms[1].rotation.x = sw * 0.8;
     playerGroup.position.y = Math.abs(Math.sin(t * 10)) * 0.12;
   } else {
-    playerGroup.userData.legs[0].rotation.x = 0;
-    playerGroup.userData.legs[1].rotation.x = 0;
+    legs[0].rotation.x = 0; legs[1].rotation.x = 0;
+    // Thở nhẹ khi đứng yên
+    arms[0].rotation.x = Math.sin(t * 1.6) * 0.06;
+    arms[1].rotation.x = -Math.sin(t * 1.6) * 0.06;
     playerGroup.position.y = 0;
   }
 
@@ -1457,17 +1546,25 @@ function renderFrame(t = performance.now() / 1000) {
    ============================================================ */
 function startGame(state) {
   S = state;
+  S.gender = chosenGender; // áp lựa chọn Nam/Nữ ở màn hình đăng nhập
   $("auth-screen").classList.add("hidden");
   $("game-root").classList.remove("hidden");
   if (!started) {
     started = true;
     initThree();
+    buildGround();
+    buildHouse();
+    buildShop();
+    buildCoop();
+    buildPlayer(S.gender);
+    buildHighlight();
     syncPlots(); syncFish(); syncAnimals(); syncDecor();
     camera.position.set(w2x(S.px), 14, w2z(S.py) + 16);
     requestAnimationFrame((t) => { lastT = t; loop(t); });
   } else {
     fishSyncKey = ""; animalSyncKey = ""; decorSyncKey = "";
     syncPlots(); syncFish(); syncAnimals(); syncDecor();
+    buildPlayer(S.gender);
   }
   renderToolbar();
   updateHUD();
@@ -1518,5 +1615,7 @@ window.__farm = {
   get decorMeshes() { return decorMeshes; },
   get facing() { return facing; },
   set facing(v) { facing = v; },
+  buildPlayer,
+  get shadow() { return playerShadow; },
   renderFrame,
 };
