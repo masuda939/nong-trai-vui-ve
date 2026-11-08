@@ -2,8 +2,9 @@
 <html lang="vi">
 <head>
 <meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
-<title>Nông Trại Vui Vẻ - Farm Game</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+<meta name="theme-color" content="#1a2f1a" />
+<title>Nông Trại Vui Vẻ 3D - Farm Game</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🌱</text></svg>" />
 <link rel="stylesheet" href="style.css" />
 </head>
@@ -11,7 +12,7 @@
   <!-- ===== Màn hình đăng nhập ===== -->
   <div id="auth-screen" class="overlay-screen">
     <div class="auth-card">
-      <div class="auth-logo">🌱<br>NÔNG TRẠI VUI VẺ</div>
+      <div class="auth-logo">🌾<br>NÔNG TRẠI VUI VẺ 3D</div>
       <p class="auth-sub">Trồng trọt · Thu hoạch · Lên cấp — tiến trình được lưu theo tài khoản</p>
 
       <div class="auth-tabs">
@@ -36,8 +37,9 @@
     <header id="hud">
       <div class="hud-left">
         <span class="hud-chip" title="Vàng">💰 <b id="hud-gold">0</b></span>
-        <span class="hud-chip" title="Ngày">📅 Ngày <b id="hud-day">1</b></span>
-        <span class="hud-chip" title="Cấp độ">⭐ Lv.<b id="hud-level">1</b></span>
+        <span class="hud-chip" title="Ngày">📅 <b id="hud-day">1</b></span>
+        <span class="hud-chip" title="Cấp độ">⭐ <b id="hud-level">1</b></span>
+        <span class="hud-chip" title="Năng lượng">⚡ <b id="hud-energy">100</b></span>
       </div>
       <div class="hud-center">
         <div class="xp-wrap" title="Kinh nghiệm">
@@ -46,14 +48,26 @@
         </div>
       </div>
       <div class="hud-right">
-        <span class="hud-chip" title="Năng lượng">⚡ <b id="hud-energy">100</b></span>
-        <button id="btn-save" class="btn btn-small" title="Lưu tiến trình (Ctrl+S)">💾 Lưu</button>
+        <button id="btn-save" class="btn btn-small" title="Lưu tiến trình (Ctrl+S)">💾</button>
         <button id="btn-logout" class="btn btn-small" title="Đăng xuất">🚪</button>
       </div>
     </header>
 
     <div id="canvas-wrap">
       <canvas id="game-canvas"></canvas>
+
+      <!-- Điều khiển cảm ứng -->
+      <div id="touch-ui">
+        <div id="joystick"><div id="joystick-knob"></div></div>
+        <div id="mobile-buttons">
+          <button id="btn-action" class="mbtn mbig">✋<small>Dùng</small></button>
+          <div class="mrow">
+            <button id="btn-shop-m" class="mbtn">🏪</button>
+            <button id="btn-bag-m" class="mbtn">🎒</button>
+            <button id="btn-sleep-m" class="mbtn">🛏️</button>
+          </div>
+        </div>
+      </div>
 
       <!-- Cửa hàng -->
       <div id="shop-panel" class="panel hidden">
@@ -87,7 +101,7 @@
       <div class="toolbar-hint">
         <span><b>WASD/⬅⬆⬇➡</b> di chuyển</span>
         <span><b>Space/E</b> dùng công cụ</span>
-        <span><b>1–6</b> chọn vật phẩm</span>
+        <span><b>1–7</b> chọn vật phẩm</span>
         <span><b>Q</b> túi đồ · <b>B</b> cửa hàng</span>
       </div>
     </footer>
@@ -95,6 +109,6 @@
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
   <script src="config.js"></script>
-  <script src="game.js"></script>
+  <script type="module" src="game.js"></script>
 </body>
 </html>

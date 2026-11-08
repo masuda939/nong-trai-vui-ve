@@ -1,36 +1,36 @@
 /* ============================================================
-   NÔNG TRẠI VUI VẺ — game nông trại 2D kiểu Stardew Valley
-   Canvas + Supabase (auth + lưu tiến trình theo tài khoản)
+   NÔNG TRẠI VUI VẺ 3D — game nông trại lấy cảm hứng Stardew Valley
+   Three.js + Supabase (auth + lưu tiến trình theo tài khoản)
+   Hỗ trợ đầy đủ điện thoại: joystick ảo + nút bấm trên màn hình
    ============================================================ */
-"use strict";
+import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js";
 
-/* ---------- Hằng số ---------- */
-const TILE = 40, COLS = 24, ROWS = 15;
+/* ---------- Hằng số logic (giữ nguyên schema save cũ) ---------- */
+const TILE = 40, COLS = 24, ROWS = 15;       // toạ độ logic (px)
 const W = COLS * TILE, H = ROWS * TILE;
-const PLAYER_SPEED = 2.6;
+const T3 = 2;                                 // kích thước 1 ô trong thế giới 3D
+const PLAYER_SPEED = 2.6;                     // px logic / frame
 const ENERGY = { till: 4, water: 2, plant: 3, harvest: 2 };
 const START_GOLD = 500;
 
 const CROPS = {
-  turnip:  { name: "Củ cải",  emoji: "🥬", seedCost: 20,  sell: 40,  days: 2, xp: 4,  level: 1, color: "#e8e8f5", leaf: "#7ec850" },
-  potato:  { name: "Khoai tây", emoji: "🥔", seedCost: 45,  sell: 95,  days: 4, xp: 9,  level: 2, color: "#c9a15f", leaf: "#5da23f" },
-  corn:    { name: "Ngô",     emoji: "🌽", seedCost: 80,  sell: 170, days: 6, xp: 16, level: 3, color: "#f5c542", leaf: "#4c8a35" },
-  tomato:  { name: "Cà chua", emoji: "🍅", seedCost: 120, sell: 95,  days: 7, xp: 22, level: 4, color: "#e04b3a", leaf: "#3f7a2e", regrow: 3 },
-  pumpkin: { name: "Bí ngô",  emoji: "🎃", seedCost: 220, sell: 420, days: 9, xp: 40, level: 5, color: "#e88b1a", leaf: "#3a6d28" },
+  turnip:  { name: "Củ cải",  emoji: "🥬", seedCost: 20,  sell: 40,  days: 2, xp: 4,  level: 1, color: 0xe8e8f5, leaf: 0x7ec850 },
+  potato:  { name: "Khoai tây", emoji: "🥔", seedCost: 45,  sell: 95,  days: 4, xp: 9,  level: 2, color: 0xc9a15f, leaf: 0x5da23f },
+  corn:    { name: "Ngô",     emoji: "🌽", seedCost: 80,  sell: 170, days: 6, xp: 16, level: 3, color: 0xf5c542, leaf: 0x4c8a35 },
+  tomato:  { name: "Cà chua", emoji: "🍅", seedCost: 120, sell: 95,  days: 7, xp: 22, level: 4, color: 0xe04b3a, leaf: 0x3f7a2e, regrow: 3 },
+  pumpkin: { name: "Bí ngô",  emoji: "🎃", seedCost: 220, sell: 420, days: 9, xp: 40, level: 5, color: 0xe88b1a, leaf: 0x3a6d28 },
 };
 const CROP_IDS = Object.keys(CROPS);
 const TOOLS = [
-  { id: "hoe",    emoji: "⛏️", name: "Cuốc" },
-  { id: "water",  emoji: "💧", name: "Bình tưới" },
+  { id: "hoe",   emoji: "⛏️", name: "Cuốc" },
+  { id: "water", emoji: "💧", name: "Bình tưới" },
   ...CROP_IDS.map((id) => ({ id: "seed_" + id, emoji: CROPS[id].emoji, name: "Hạt " + CROPS[id].name, seed: id })),
 ];
 
-/* ---------- Bản đồ ---------- */
-// Nhà (góc trên trái), cửa hàng (góc trên phải), ao (giữa), đất canh tác ở giữa
-const HOUSE = { x: 1, y: 1, w: 5, h: 4 };   // ô chiếm chỗ + cửa ở (3,4)
+const HOUSE = { x: 1, y: 1, w: 5, h: 4 };
 const SHOP  = { x: 18, y: 1, w: 4, h: 3 };
 const POND  = { x: 10, y: 2, w: 5, h: 3 };
-const FARM  = { x: 3, y: 6, w: 18, h: 7 };  // vùng được phép cuốc đất
+const FARM  = { x: 3, y: 6, w: 18, h: 7 };
 const DOOR  = { x: 3, y: 4 };
 const SHOP_COUNTER = { x: 19, y: 4 };
 
@@ -39,59 +39,19 @@ function isSolid(x, y) {
   if (x < 0 || y < 0 || x >= COLS || y >= ROWS) return true;
   return inRect(x, y, HOUSE) || inRect(x, y, SHOP) || inRect(x, y, POND);
 }
-function isFarmTile(x, y) {
-  return inRect(x, y, FARM) && !inRect(x, y, POND);
-}
+function isFarmTile(x, y) { return inRect(x, y, FARM) && !inRect(x, y, POND); }
 
 /* ---------- Trạng thái game ---------- */
-let S = null; // state
+let S = null;
 function freshState() {
   return {
-    v: 1,
-    gold: START_GOLD,
-    level: 1,
-    xp: 0,
-    day: 1,
-    energy: 100,
-    inv: { seed_turnip: 6 }, // quà khởi đầu
-    tiles: {}, // "x,y" -> {t:1 (đã cuốc), w:1 (đã tưới), c:{id, stage, w, r}}
-    px: 8 * TILE, py: 8 * TILE,
+    v: 1, gold: START_GOLD, level: 1, xp: 0, day: 1, energy: 100,
+    inv: { seed_turnip: 6 }, tiles: {}, px: 8 * TILE, py: 8 * TILE,
   };
 }
 const xpNeed = (lv) => lv * 50;
 
-/* ---------- Canvas ---------- */
-const cvs = document.getElementById("game-canvas");
-const ctx = cvs.getContext("2d");
-cvs.width = W; cvs.height = H;
-const DPR = Math.min(window.devicePixelRatio || 1, 2);
-cvs.width = W * DPR; cvs.height = H * DPR;
-cvs.style.aspectRatio = "1.5";
-ctx.scale(DPR, DPR);
-
-/* ---------- Input ---------- */
-const keys = {};
-let selectedSlot = 0;
-let facing = { dx: 0, dy: 1 };
-
-window.addEventListener("keydown", (e) => {
-  if (authScreenVisible()) return;
-  const k = e.key.toLowerCase();
-  keys[k] = true;
-  if (["arrowup", "arrowdown", "arrowleft", "arrowright", " "].includes(k)) e.preventDefault();
-  if (k >= "1" && k <= "6") {
-    const i = parseInt(k) - 1;
-    if (i < TOOLS.length && slotAvailable(i)) { selectedSlot = i; renderToolbar(); }
-  }
-  if (k === " " || k === "e") doAction();
-  if (k === "b") togglePanel("shop-panel");
-  if (k === "q") togglePanel("bag-panel");
-  if (k === "enter") trySleep();
-  if (e.ctrlKey && k === "s") { e.preventDefault(); saveGame(true); }
-});
-window.addEventListener("keyup", (e) => { keys[e.key.toLowerCase()] = false; });
-
-/* ---------- Tiện ích ---------- */
+/* ---------- Tiện ích DOM ---------- */
 const $ = (id) => document.getElementById(id);
 let toastTimer = null;
 function toast(msg) {
@@ -108,15 +68,13 @@ function slotAvailable(i) {
 /* ============================================================
    SUPABASE — xác thực & lưu game
    ============================================================ */
-let sb = null;          // supabase client
-let currentUser = null; // { id, email }
+let sb = null;
+let currentUser = null;
 
 function supabaseConfigured() {
   const c = window.SUPABASE_CONFIG || {};
-  return typeof c.url === "string" &&
-    /^https?:\/\/.+\.supabase\.(co|in)/.test(c.url) &&
-    typeof c.anonKey === "string" && c.anonKey.length > 20 &&
-    !c.url.includes("YOUR-PROJECT");
+  return typeof c.url === "string" && /^https?:\/\/.+\.supabase\.(co|in)/.test(c.url) &&
+    typeof c.anonKey === "string" && c.anonKey.length > 20 && !c.url.includes("YOUR-PROJECT");
 }
 function initSupabase() {
   if (!supabaseConfigured()) {
@@ -127,10 +85,7 @@ function initSupabase() {
   try {
     sb = window.supabase.createClient(window.SUPABASE_CONFIG.url, window.SUPABASE_CONFIG.anonKey);
     $("cloud-status").textContent = "☁️ Đã kết nối Supabase — tạo tài khoản để lưu tiến trình!";
-    // Tự động đăng nhập nếu phiên còn hiệu lực
-    sb.auth.getSession().then(({ data }) => {
-      if (data?.session?.user) onSignedIn(data.session.user);
-    });
+    sb.auth.getSession().then(({ data }) => { if (data?.session?.user) onSignedIn(data.session.user); });
     sb.auth.onAuthStateChange((_ev, session) => {
       if (session?.user && (!currentUser || currentUser.id !== session.user.id)) onSignedIn(session.user);
     });
@@ -139,10 +94,8 @@ function initSupabase() {
     $("cloud-status").textContent = "⚠️ Lỗi kết nối Supabase — dùng chế độ khách.";
   }
 }
-
 function authScreenVisible() { return !$("auth-screen").classList.contains("hidden"); }
 
-// ---- UI auth ----
 let authMode = "login";
 function setAuthMode(m) {
   authMode = m;
@@ -170,11 +123,8 @@ $("auth-submit").onclick = async () => {
       if (error) throw error;
       toast("Tài khoản đã tạo!");
     }
-  } catch (e) {
-    err.textContent = translateAuthError(e.message);
-  } finally {
-    $("auth-submit").disabled = false;
-  }
+  } catch (e) { err.textContent = translateAuthError(e.message); }
+  finally { $("auth-submit").disabled = false; }
 };
 function translateAuthError(msg) {
   if (/invalid login/i.test(msg)) return "Sai email hoặc mật khẩu.";
@@ -185,11 +135,7 @@ function translateAuthError(msg) {
   return msg;
 }
 
-$("auth-guest").onclick = () => {
-  currentUser = null;
-  startGame(loadLocal() || freshState());
-};
-
+$("auth-guest").onclick = () => { currentUser = null; startGame(loadLocal() || freshState()); };
 $("btn-logout").onclick = async () => {
   if (sb) { try { await saveGame(true); await sb.auth.signOut(); } catch (_) {} }
   location.reload();
@@ -198,7 +144,6 @@ $("btn-logout").onclick = async () => {
 function onSignedIn(user) {
   currentUser = { id: user.id, email: user.email };
   $("auth-screen").classList.add("hidden");
-  // Tải tiến trình đã lưu (nếu có)
   loadCloud().then((state) => {
     if (state) { S = state; toast("Đã tải tiến trình của bạn!"); }
     else { S = freshState(); toast("Chào mừng đến với nông trại mới!"); saveCloud(); }
@@ -209,20 +154,11 @@ function onSignedIn(user) {
 /* ---- Local (khách) ---- */
 const LS_KEY = "farm_save_guest";
 function loadLocal() {
-  try {
-    const raw = localStorage.getItem(LS_KEY);
-    return raw ? migrate(JSON.parse(raw)) : null;
-  } catch { return null; }
+  try { const raw = localStorage.getItem(LS_KEY); return raw ? migrate(JSON.parse(raw)) : null; }
+  catch { return null; }
 }
-function saveLocal() {
-  if (!S) return;
-  try { localStorage.setItem(LS_KEY, JSON.stringify(S)); } catch (_) {}
-}
-function migrate(st) {
-  // Đảm bảo đủ field khi load save cũ
-  const f = freshState();
-  return Object.assign(f, st, { inv: Object.assign({}, st.inv || {}) });
-}
+function saveLocal() { if (!S) return; try { localStorage.setItem(LS_KEY, JSON.stringify(S)); } catch (_) {} }
+function migrate(st) { const f = freshState(); return Object.assign(f, st, { inv: Object.assign({}, st.inv || {}) }); }
 
 /* ---- Cloud (Supabase) ---- */
 async function loadCloud() {
@@ -256,45 +192,409 @@ setInterval(() => { if (!authScreenVisible()) saveGame(); }, 20000);
 window.addEventListener("beforeunload", () => { saveLocal(); });
 
 /* ============================================================
-   BẮT ĐẦU GAME
+   THREE.JS — dựng cảnh 3D
    ============================================================ */
-function startGame(state) {
-  S = state;
-  $("auth-screen").classList.add("hidden");
-  $("game-root").classList.remove("hidden");
-  renderToolbar();
-  updateHUD();
-  requestAnimationFrame(loop);
+const canvas = $("game-canvas");
+let renderer, scene, camera, dirLight;
+let playerGroup, highlightMesh, camDist = 16;
+const plotMeshes = new Map();   // "x,y" -> {group, soilMat, cropKey}
+const labelSprites = [];
+let clock = new THREE.Clock();
+
+const w2x = (px) => (px / TILE - COLS / 2 + 0.5) * T3;   // px logic -> world x
+const w2z = (py) => (py / TILE - ROWS / 2 + 0.5) * T3;   // py logic -> world z
+const t2x = (tx) => (tx - COLS / 2 + 0.5) * T3;
+const t2z = (ty) => (ty - ROWS / 2 + 0.5) * T3;
+
+function initThree() {
+  renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+  scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x87ceeb);
+  scene.fog = new THREE.Fog(0x87ceeb, 34, 95);
+
+  camera = new THREE.PerspectiveCamera(50, 16 / 9, 0.1, 300);
+
+  // Ánh sáng
+  const hemi = new THREE.HemisphereLight(0xffffff, 0x5a7a3a, 1.0);
+  scene.add(hemi);
+  dirLight = new THREE.DirectionalLight(0xfff3d6, 1.6);
+  dirLight.position.set(14, 24, 10);
+  dirLight.castShadow = true;
+  dirLight.shadow.mapSize.set(1024, 1024);
+  dirLight.shadow.camera.left = -40; dirLight.shadow.camera.right = 40;
+  dirLight.shadow.camera.top = 40; dirLight.shadow.camera.bottom = -40;
+  scene.add(dirLight);
+
+  // Mặt đất cỏ
+  const ground = new THREE.Mesh(
+    new THREE.PlaneGeometry(COLS * T3 + 30, ROWS * T3 + 30),
+    new THREE.MeshLambertMaterial({ color: 0x6aa84f })
+  );
+  ground.rotation.x = -Math.PI / 2;
+  ground.receiveShadow = true;
+  scene.add(ground);
+
+  // Vùng ruộng (tint đất)
+  const farmPatch = new THREE.Mesh(
+    new THREE.PlaneGeometry(FARM.w * T3, FARM.h * T3),
+    new THREE.MeshLambertMaterial({ color: 0x8f9a4e })
+  );
+  farmPatch.rotation.x = -Math.PI / 2;
+  farmPatch.position.set(
+    (FARM.x + FARM.w / 2 - COLS / 2) * T3, 0.01,
+    (FARM.y + FARM.h / 2 - ROWS / 2) * T3
+  );
+  farmPatch.receiveShadow = true;
+  scene.add(farmPatch);
+
+  // Ao
+  const pond = new THREE.Mesh(
+    new THREE.CircleGeometry(POND.w * T3 / 2, 24),
+    new THREE.MeshLambertMaterial({ color: 0x4a90d9 })
+  );
+  pond.rotation.x = -Math.PI / 2;
+  pond.position.set(
+    (POND.x + POND.w / 2 - COLS / 2) * T3, 0.03,
+    (POND.y + POND.h / 2 - ROWS / 2) * T3
+  );
+  scene.add(pond);
+
+  buildHouse();
+  buildShop();
+  buildPlayer();
+  buildHighlight();
+
+  onResize();
+  window.addEventListener("resize", onResize);
 }
+
+function onResize() {
+  const wrap = $("canvas-wrap");
+  const w = wrap.clientWidth || window.innerWidth;
+  const h = wrap.clientHeight || window.innerHeight;
+  renderer.setSize(w, h, false);
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+}
+
+function makeLabel(text, opts = {}) {
+  const c = document.createElement("canvas");
+  c.width = 512; c.height = 128;
+  const g = c.getContext("2d");
+  g.font = "bold 64px 'Segoe UI', sans-serif";
+  g.textAlign = "center"; g.textBaseline = "middle";
+  g.lineWidth = 10; g.strokeStyle = "rgba(0,0,0,.55)";
+  g.strokeText(text, 256, 64);
+  g.fillStyle = opts.color || "#fff";
+  g.fillText(text, 256, 64);
+  const tex = new THREE.CanvasTexture(c);
+  const spr = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false }));
+  spr.scale.set(opts.w || 6, (opts.w || 6) / 4, 1);
+  labelSprites.push(spr);
+  return spr;
+}
+
+function buildHouse() {
+  const g = new THREE.Group();
+  const cx = t2x(HOUSE.x + HOUSE.w / 2), cz = t2z(HOUSE.y + HOUSE.h / 2);
+  const walls = new THREE.Mesh(
+    new THREE.BoxGeometry(HOUSE.w * T3 - 1, 3.2, HOUSE.h * T3 - 1),
+    new THREE.MeshLambertMaterial({ color: 0xb5651d })
+  );
+  walls.position.y = 1.6;
+  walls.castShadow = true; walls.receiveShadow = true;
+  g.add(walls);
+  const roof = new THREE.Mesh(
+    new THREE.ConeGeometry(HOUSE.w * T3 * 0.78, 2.6, 4),
+    new THREE.MeshLambertMaterial({ color: 0x8b3a1a })
+  );
+  roof.position.y = 4.4; roof.rotation.y = Math.PI / 4;
+  roof.castShadow = true;
+  g.add(roof);
+  const door = new THREE.Mesh(
+    new THREE.BoxGeometry(1.2, 1.9, 0.25),
+    new THREE.MeshLambertMaterial({ color: 0x5a3a1a })
+  );
+  door.position.set(0, 0.95, (HOUSE.h * T3 - 1) / 2);
+  g.add(door);
+  const label = makeLabel("🏠 Nhà của bạn");
+  label.position.set(0, 6.4, 0);
+  g.add(label);
+  g.position.set(cx, 0, cz);
+  scene.add(g);
+}
+
+function buildShop() {
+  const g = new THREE.Group();
+  const cx = t2x(SHOP.x + SHOP.w / 2), cz = t2z(SHOP.y + SHOP.h / 2);
+  const body = new THREE.Mesh(
+    new THREE.BoxGeometry(SHOP.w * T3 - 1, 2.6, SHOP.h * T3 - 1),
+    new THREE.MeshLambertMaterial({ color: 0x7a5230 })
+  );
+  body.position.y = 1.3;
+  body.castShadow = true; body.receiveShadow = true;
+  g.add(body);
+  const awning = new THREE.Mesh(
+    new THREE.BoxGeometry(SHOP.w * T3 + 0.6, 0.35, SHOP.h * T3 * 0.8),
+    new THREE.MeshLambertMaterial({ color: 0xd9534f })
+  );
+  awning.position.set(0, 3.1, 0.9);
+  awning.rotation.x = -0.25;
+  awning.castShadow = true;
+  g.add(awning);
+  // Quầy bán hàng
+  const counter = new THREE.Mesh(
+    new THREE.BoxGeometry(1.6, 1, 1.1),
+    new THREE.MeshLambertMaterial({ color: 0xa0713f })
+  );
+  counter.position.set(-1.5, 0.5, (SHOP.h * T3 - 1) / 2 + 1);
+  counter.castShadow = true;
+  g.add(counter);
+  const coin = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.45, 0.45, 0.12, 20),
+    new THREE.MeshLambertMaterial({ color: 0xf5c542 })
+  );
+  coin.rotation.x = Math.PI / 2;
+  coin.position.set(-1.5, 1.25, (SHOP.h * T3 - 1) / 2 + 1);
+  g.add(coin);
+  const label = makeLabel("🏪 CỬA HÀNG");
+  label.position.set(0, 5.6, 0);
+  g.add(label);
+  g.position.set(cx, 0, cz);
+  scene.add(g);
+}
+
+function buildPlayer() {
+  const g = new THREE.Group();
+  const mat = (c) => new THREE.MeshLambertMaterial({ color: c });
+  // thân
+  const body = new THREE.Mesh(new THREE.BoxGeometry(0.8, 1.0, 0.5), mat(0xe04b3a));
+  body.position.y = 1.05; body.castShadow = true;
+  g.add(body);
+  // chân
+  const legL = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.55, 0.3), mat(0x3a5a8a));
+  legL.position.set(-0.2, 0.28, 0); legL.castShadow = true;
+  const legR = legL.clone(); legR.position.x = 0.2;
+  g.add(legL, legR);
+  g.userData.legs = [legL, legR];
+  // đầu
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.42, 16, 12), mat(0xf0c8a0));
+  head.position.y = 1.95; head.castShadow = true;
+  g.add(head);
+  // mũ
+  const brim = new THREE.Mesh(new THREE.CylinderGeometry(0.62, 0.62, 0.08, 16), mat(0xf5c542));
+  brim.position.y = 2.22;
+  const top = new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.36, 0.3, 16), mat(0xf5c542));
+  top.position.y = 2.38;
+  g.add(brim, top);
+  playerGroup = g;
+  scene.add(g);
+}
+
+function buildHighlight() {
+  const geo = new THREE.EdgesGeometry(new THREE.PlaneGeometry(T3 * 0.94, T3 * 0.94));
+  highlightMesh = new THREE.LineSegments(geo, new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.85 }));
+  highlightMesh.rotation.x = -Math.PI / 2;
+  scene.add(highlightMesh);
+}
+
+/* --- Ô ruộng & cây trong 3D --- */
+function cropKey(c) { return c ? c.id + "|" + c.stage + "|" + (c.w ? 1 : 0) : "none"; }
+
+function syncPlots() {
+  if (!S) return;
+  const seen = new Set();
+  for (const k in S.tiles) {
+    seen.add(k);
+    const t = S.tiles[k];
+    const [x, y] = k.split(",").map(Number);
+    let entry = plotMeshes.get(k);
+    if (!entry) {
+      const group = new THREE.Group();
+      const soilMat = new THREE.MeshLambertMaterial({ color: 0x8a5a2b });
+      const soil = new THREE.Mesh(new THREE.BoxGeometry(T3 * 0.92, 0.22, T3 * 0.92), soilMat);
+      soil.position.y = 0.11;
+      soil.receiveShadow = true;
+      group.add(soil);
+      const cropHolder = new THREE.Group();
+      group.add(cropHolder);
+      entry = { group, soilMat, cropHolder, lastKey: "" };
+      group.position.set(t2x(x), 0, t2z(y));
+      scene.add(group);
+      plotMeshes.set(k, entry);
+    }
+    entry.soilMat.color.setHex(t.w ? 0x5b3a1e : 0x8a5a2b);
+    const key = cropKey(t.c);
+    if (key !== entry.lastKey) {
+      entry.lastKey = key;
+      buildCropMesh(entry.cropHolder, t.c);
+    }
+  }
+  // dọn ô không còn trong state (hiếm)
+  for (const k of [...plotMeshes.keys()]) {
+    if (!seen.has(k)) {
+      scene.remove(plotMeshes.get(k).group);
+      plotMeshes.delete(k);
+    }
+  }
+}
+
+function buildCropMesh(holder, c) {
+  // Xoá cây cũ
+  while (holder.children.length) {
+    const ch = holder.children.pop();
+    ch.traverse?.((o) => { o.geometry?.dispose(); o.material?.dispose?.(); });
+  }
+  if (!c) return;
+  const def = CROPS[c.id];
+  const ready = c.stage >= def.days;
+  const mat = (col) => new THREE.MeshLambertMaterial({ color: col });
+  if (ready) {
+    const leafBall = new THREE.Mesh(new THREE.SphereGeometry(0.55, 10, 8), mat(def.leaf));
+    leafBall.position.y = 0.75; leafBall.castShadow = true;
+    const fruit = new THREE.Mesh(new THREE.SphereGeometry(0.42, 12, 10), mat(def.color));
+    fruit.position.y = 1.15; fruit.castShadow = true;
+    holder.add(leafBall, fruit);
+  } else {
+    const prog = c.stage / def.days;
+    const stemH = 0.3 + prog * 0.9;
+    const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.09, stemH, 6), mat(def.leaf));
+    stem.position.y = stemH / 2 + 0.1;
+    const leafSize = 0.14 + prog * 0.22;
+    const leafL = new THREE.Mesh(new THREE.SphereGeometry(leafSize, 8, 6), mat(def.leaf));
+    leafL.position.set(-leafSize, stemH + 0.05, 0);
+    leafL.scale.set(1.4, 0.6, 1);
+    const leafR = leafL.clone(); leafR.position.x = leafSize;
+    holder.add(stem, leafL, leafR);
+  }
+  if (c.w && !ready) {
+    const drop = new THREE.Mesh(new THREE.OctahedronGeometry(0.16), new THREE.MeshLambertMaterial({ color: 0x6ec6ff, transparent: true, opacity: 0.9 }));
+    drop.position.y = 1.9;
+    holder.add(drop);
+  }
+}
+
+/* ============================================================
+   INPUT — bàn phím + cảm ứng (joystick ảo)
+   ============================================================ */
+const keys = {};
+let selectedSlot = 0;
+let facing = { dx: 0, dy: 1 };
+const joy = { active: false, x: 0, y: 0, id: null };
+let pinchStart = null;
+
+window.addEventListener("keydown", (e) => {
+  if (authScreenVisible()) return;
+  const k = e.key.toLowerCase();
+  keys[k] = true;
+  if (["arrowup", "arrowdown", "arrowleft", "arrowright", " "].includes(k)) e.preventDefault();
+  if (k >= "1" && k <= "7") {
+    const i = parseInt(k) - 1;
+    if (i < TOOLS.length && slotAvailable(i)) { selectedSlot = i; renderToolbar(); }
+  }
+  if (k === " " || k === "e") doAction();
+  if (k === "b") togglePanel("shop-panel");
+  if (k === "q") togglePanel("bag-panel");
+  if (k === "enter") trySleep();
+  if (e.ctrlKey && k === "s") { e.preventDefault(); saveGame(true); }
+});
+window.addEventListener("keyup", (e) => { keys[e.key.toLowerCase()] = false; });
+
+/* Joystick ảo */
+const joyBase = $("joystick"), joyKnob = $("joystick-knob");
+function joyFromTouch(t) {
+  const rect = joyBase.getBoundingClientRect();
+  const cx = rect.left + rect.width / 2, cy = rect.top + rect.height / 2;
+  let dx = t.clientX - cx, dy = t.clientY - cy;
+  const max = rect.width / 2;
+  const len = Math.hypot(dx, dy);
+  if (len > max) { dx = dx / len * max; dy = dy / len * max; }
+  joy.x = dx / max; joy.y = dy / max;
+  joyKnob.style.transform = `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`;
+}
+function joyEnd() {
+  joy.active = false; joy.x = 0; joy.y = 0; joy.id = null;
+  joyKnob.style.transform = "translate(-50%, -50%)";
+}
+joyBase.addEventListener("touchstart", (e) => {
+  e.preventDefault();
+  joy.active = true; joy.id = e.changedTouches[0].identifier;
+  joyFromTouch(e.changedTouches[0]);
+}, { passive: false });
+window.addEventListener("touchmove", (e) => {
+  if (!joy.active) return;
+  const t = [...e.changedTouches].find((x) => x.identifier === joy.id);
+  if (t) { e.preventDefault(); joyFromTouch(t); }
+}, { passive: false });
+window.addEventListener("touchend", (e) => {
+  const t = [...e.changedTouches].find((x) => x.identifier === joy.id);
+  if (t) joyEnd();
+});
+window.addEventListener("touchcancel", joyEnd);
+
+/* Pinch zoom + wheel zoom */
+canvas.addEventListener("touchstart", (e) => {
+  if (e.touches.length === 2) {
+    pinchStart = Math.hypot(
+      e.touches[0].clientX - e.touches[1].clientX,
+      e.touches[0].clientY - e.touches[1].clientY
+    );
+  }
+}, { passive: true });
+canvas.addEventListener("touchmove", (e) => {
+  if (pinchStart && e.touches.length === 2) {
+    e.preventDefault();
+    const d = Math.hypot(
+      e.touches[0].clientX - e.touches[1].clientX,
+      e.touches[0].clientY - e.touches[1].clientY
+    );
+    camDist = Math.min(30, Math.max(8, camDist * (pinchStart / d)));
+    pinchStart = d;
+  }
+}, { passive: false });
+canvas.addEventListener("touchend", () => { pinchStart = null; });
+canvas.addEventListener("wheel", (e) => {
+  camDist = Math.min(30, Math.max(8, camDist * (1 + Math.sign(e.deltaY) * 0.1)));
+}, { passive: true });
+
+/* Nút cảm ứng */
+$("btn-action").addEventListener("click", () => doAction());
+$("btn-shop-m").addEventListener("click", () => togglePanel("shop-panel"));
+$("btn-bag-m").addEventListener("click", () => togglePanel("bag-panel"));
+$("btn-sleep-m").addEventListener("click", () => trySleep());
+$("btn-save-m").addEventListener("click", () => saveGame(true));
 
 /* ============================================================
    VÒNG LẶP GAME
    ============================================================ */
-let lastT = 0;
+let lastT = 0, started = false;
 function loop(t) {
   const dt = Math.min((t - lastT) / 16.67, 3); lastT = t;
   update(dt);
-  render();
+  renderFrame();
   requestAnimationFrame(loop);
 }
 
 function update(dt) {
-  let dx = 0, dy = 0;
-  if (keys["w"] || keys["arrowup"]) dy -= 1;
-  if (keys["s"] || keys["arrowdown"]) dy += 1;
-  if (keys["a"] || keys["arrowleft"]) dx -= 1;
-  if (keys["d"] || keys["arrowright"]) dx += 1;
-  if (dx || dy) {
-    const len = Math.hypot(dx, dy);
-    dx /= len; dy /= len;
-    facing = Math.abs(dx) > Math.abs(dy) ? { dx: Math.sign(dx), dy: 0 } : { dx: 0, dy: Math.sign(dy) };
-    tryMove(dx * PLAYER_SPEED * dt, dy * PLAYER_SPEED * dt);
-  }
+  let ix = (keys["d"] || keys["arrowright"] ? 1 : 0) - (keys["a"] || keys["arrowleft"] ? 1 : 0);
+  let iy = (keys["s"] || keys["arrowdown"] ? 1 : 0) - (keys["w"] || keys["arrowup"] ? 1 : 0);
+  if (joy.active && Math.hypot(joy.x, joy.y) > 0.18) { ix = joy.x; iy = joy.y; }
+  if (ix || iy) {
+    const len = Math.hypot(ix, iy);
+    ix /= Math.max(len, 1); iy /= Math.max(len, 1);
+    facing = Math.abs(ix) > Math.abs(iy) ? { dx: Math.sign(ix), dy: 0 } : { dx: 0, dy: Math.sign(iy) };
+    tryMove(ix * PLAYER_SPEED * dt, iy * PLAYER_SPEED * dt);
+    playerGroup.userData.moving = true;
+  } else playerGroup.userData.moving = false;
 }
 
 function tryMove(mx, my) {
-  const r = 12; // bán kính va chạm
-  let nx = S.px + mx, ny = S.py + my;
+  const r = 12;
+  const nx = S.px + mx, ny = S.py + my;
   if (!collides(nx + Math.sign(mx) * r, S.py)) S.px = nx;
   if (!collides(S.px, ny + Math.sign(my) * r)) S.py = ny;
 }
@@ -303,9 +603,6 @@ function collides(px, py) {
   return isSolid(tx, ty);
 }
 
-/* ============================================================
-   HÀNH ĐỘNG (cuốc / trồng / tưới / thu hoạch)
-   ============================================================ */
 function facingTile() {
   const cx = Math.floor((S.px + TILE / 2) / TILE);
   const cy = Math.floor((S.py + TILE / 2) / TILE);
@@ -313,20 +610,19 @@ function facingTile() {
 }
 function keyOf(x, y) { return x + "," + y; }
 
+/* ============================================================
+   HÀNH ĐỘNG (cuốc / trồng / tưới / thu hoạch)
+   ============================================================ */
 function doAction() {
+  if (!S || authScreenVisible()) return;
   const { x, y } = facingTile();
   const k = keyOf(x, y);
   const tool = TOOLS[selectedSlot];
   const tile = S.tiles[k];
 
-  // 1) Thu hoạch luôn ưu tiên
-  if (tile?.c && cropReady(tile.c)) { harvest(x, y, tile); return; }
-
-  // 2) Ngủ / cửa hàng nếu đứng cạnh
+  if (tile?.c && cropReady(tile.c)) { harvest(tile); return; }
   if (Math.abs(x - DOOR.x) <= 1 && Math.abs(y - DOOR.y) <= 1) { togglePanel("sleep-panel"); return; }
   if (Math.abs(x - SHOP_COUNTER.x) <= 1 && Math.abs(y - SHOP_COUNTER.y) <= 1) { togglePanel("shop-panel"); return; }
-
-  // 3) Công cụ
   if (!isFarmTile(x, y)) { toast("Chỉ canh tác được trên đất ruộng!"); return; }
   if (S.energy <= 0) { toast("Quá mệt rồi! Hãy đi ngủ để hồi phục ⚡"); return; }
 
@@ -334,15 +630,13 @@ function doAction() {
     if (tile?.t) { toast("Đất đã được cuốc rồi."); return; }
     if (tile?.c) return;
     S.tiles[k] = { t: 1, w: 0, c: null };
-    useEnergy(ENERGY.till);
-    sfx("till");
+    useEnergy(ENERGY.till); sfx("till");
   } else if (tool.id === "water") {
     if (!tile?.t) { toast("Cần cuốc đất trước đã!"); return; }
     if (tile.w) { toast("Đã tưới nước rồi."); return; }
     tile.w = 1;
     if (tile.c) tile.c.w = 1;
-    useEnergy(ENERGY.water);
-    sfx("water");
+    useEnergy(ENERGY.water); sfx("water");
   } else if (tool.seed) {
     if (!tile?.t) { toast("Cần cuốc đất trước khi gieo hạt!"); return; }
     if (tile.c) { toast("Ô này đã có cây."); return; }
@@ -350,15 +644,15 @@ function doAction() {
     if ((S.inv[seedKey] || 0) <= 0) { toast("Hết hạt giống! Mua ở cửa hàng 🏪"); return; }
     S.inv[seedKey]--;
     S.tiles[k].c = { id: tool.seed, stage: 0, w: 0, r: 0 };
-    useEnergy(ENERGY.plant);
-    sfx("plant");
+    useEnergy(ENERGY.plant); sfx("plant");
     renderToolbar();
   }
+  syncPlots();
   updateHUD();
 }
 function cropReady(c) { return c.stage >= CROPS[c.id].days; }
 
-function harvest(x, y, tile) {
+function harvest(tile) {
   const def = CROPS[tile.c.id];
   if (S.energy <= 0) { toast("Quá mệt rồi! Hãy đi ngủ để hồi phục ⚡"); return; }
   const key = "crop_" + tile.c.id;
@@ -366,11 +660,9 @@ function harvest(x, y, tile) {
   gainXP(def.xp);
   if (def.regrow) { tile.c.stage = def.days - def.regrow; tile.c.w = 0; }
   else { tile.c = null; tile.w = 0; tile.t = 1; }
-  useEnergy(ENERGY.harvest);
-  sfx("harvest");
+  useEnergy(ENERGY.harvest); sfx("harvest");
   toast("Thu hoạch được 1 " + def.name + "! (+" + def.xp + " XP)");
-  renderToolbar();
-  updateHUD();
+  syncPlots(); renderToolbar(); updateHUD();
 }
 
 function useEnergy(n) { S.energy = Math.max(0, S.energy - n); }
@@ -388,7 +680,7 @@ function showLevelUp(lv, unlocked) {
   const el = $("levelup-toast");
   el.classList.remove("hidden");
   setTimeout(() => el.classList.add("hidden"), 2600);
-  if (unlocked.length) toast("🌱 Mở khóa: " + unlocked.map((id) => CROPS[id].name).join(", ") + "!"); 
+  if (unlocked.length) toast("🌱 Mở khóa: " + unlocked.map((id) => CROPS[id].name).join(", ") + "!");
   sfx("levelup");
 }
 
@@ -396,28 +688,20 @@ function showLevelUp(lv, unlocked) {
    NGỦ QUA ĐÊM
    ============================================================ */
 function trySleep() { if (!authScreenVisible()) togglePanel("sleep-panel"); }
-
 function doSleep() {
-  // Cây chỉ lớn lên nếu đã được tưới hôm đó
   let grew = 0;
   for (const k in S.tiles) {
     const t = S.tiles[k];
-    if (t.c && !cropReady(t.c) && t.c.w) {
-      t.c.stage = Math.min(t.c.stage + 1, CROPS[t.c.id].days);
-      grew++;
-    }
+    if (t.c && !cropReady(t.c) && t.c.w) { t.c.stage = Math.min(t.c.stage + 1, CROPS[t.c.id].days); grew++; }
     if (t.c) t.c.w = 0;
     t.w = 0;
   }
-  S.day++;
-  S.energy = 100;
+  S.day++; S.energy = 100;
   closePanels();
   toast("☀️ Ngày mới! " + (grew ? grew + " cây đã lớn lên." : "Đừng quên tưới nước!"));
-  saveGame();
-  updateHUD();
+  syncPlots(); saveGame(); updateHUD();
 }
 $("btn-sleep-confirm").onclick = doSleep;
-// Hiện thông tin khi mở panel ngủ
 const sleepObserver = new MutationObserver(() => {
   if (!$("sleep-panel").classList.contains("hidden") && S) {
     const ready = Object.values(S.tiles).filter((t) => t.c && cropReady(t.c)).length;
@@ -453,19 +737,17 @@ function renderShop() {
     const row = document.createElement("div");
     row.className = "shop-item" + (locked ? " locked" : "");
     row.innerHTML = `
-      <span style="font-size:26px">${c.emoji}</span>
+      <span class="item-emoji">${c.emoji}</span>
       <div class="grow">
         <div class="name">Hạt ${c.name}</div>
-        <div class="desc">${c.days} ngày · bán ${c.sell}💰 · ${c.xp} XP ${c.regrow ? "· mọc lại 🌿" : ""} ${locked ? "· 🔒 Cần Lv." + c.level : ""}</div>
+        <div class="desc">${c.days} ngày · bán ${c.sell}💰 · ${c.xp} XP ${c.regrow ? "· mọc lại 🌿" : ""}${locked ? " · 🔒 Cần Lv." + c.level : ""}</div>
       </div>
       <button class="btn btn-small" ${locked || S.gold < c.seedCost ? "disabled" : ""}>${c.seedCost}💰</button>`;
     if (!locked) row.querySelector("button").onclick = () => {
       if (S.gold < c.seedCost) { toast("Không đủ vàng!"); return; }
       S.gold -= c.seedCost;
       S.inv["seed_" + id] = (S.inv["seed_" + id] || 0) + 1;
-      sfx("buy");
-      updateHUD(); renderToolbar(); renderShop();
-      saveGame();
+      sfx("buy"); updateHUD(); renderToolbar(); renderShop(); saveGame();
     };
     list.appendChild(row);
   });
@@ -485,17 +767,15 @@ function renderBag() {
     const row = document.createElement("div");
     row.className = "bag-item";
     row.innerHTML = `
-      <span style="font-size:26px">${c.emoji}</span>
+      <span class="item-emoji">${c.emoji}</span>
       <div class="grow"><div class="name">${c.name} ×${S.inv[k]}</div>
       <div class="desc">Bán ${c.sell}💰/cái → tổng ${c.sell * S.inv[k]}💰</div></div>
       <button class="btn btn-small btn-primary">Bán tất cả</button>`;
     row.querySelector("button").onclick = () => {
       S.gold += c.sell * S.inv[k];
       S.inv[k] = 0;
-      sfx("sell");
-      toast("Đã bán " + c.name + "!");
-      updateHUD(); renderBag(); renderToolbar();
-      saveGame();
+      sfx("sell"); toast("Đã bán " + c.name + "!");
+      updateHUD(); renderBag(); renderToolbar(); saveGame();
     };
     list.appendChild(row);
   });
@@ -503,7 +783,7 @@ function renderBag() {
     const id = k.slice(5), c = CROPS[id];
     const row = document.createElement("div");
     row.className = "bag-item";
-    row.innerHTML = `<span style="font-size:26px">${c.emoji}</span>
+    row.innerHTML = `<span class="item-emoji">${c.emoji}</span>
       <div class="grow"><div class="name">Hạt ${c.name} ×${S.inv[k]}</div><div class="desc">Dùng để gieo trồng</div></div>`;
     list.appendChild(row);
   });
@@ -537,157 +817,79 @@ function renderToolbar() {
 }
 
 /* ============================================================
-   VẼ GAME (pixel-art bằng canvas)
+   RENDER 3D
    ============================================================ */
-// Nền cỏ được tạo ngẫu nhiên 1 lần
-const grassNoise = [];
-for (let i = 0; i < 400; i++) grassNoise.push({ x: Math.random() * W, y: Math.random() * H, s: 1 + Math.random() * 2 });
+function renderFrame() {
+  const time = performance.now() / 1000;
 
-function render() {
-  drawGround();
-  drawFarmTiles();
-  drawBuildings();
-  drawPlayer();
-  drawTileHighlight();
-}
+  // Vị trí nhân vật
+  const px = w2x(S.px), pz = w2z(S.py);
+  playerGroup.position.set(px, 0, pz);
+  playerGroup.rotation.y = Math.atan2(facing.dx, facing.dy);
 
-function drawGround() {
-  ctx.fillStyle = "#6aa84f";
-  ctx.fillRect(0, 0, W, H);
-  ctx.fillStyle = "rgba(255,255,255,.06)";
-  grassNoise.forEach((g) => ctx.fillRect(g.x | 0, g.y | 0, g.s, g.s));
-  // Vùng ruộng (đất hơi khác màu)
-  ctx.fillStyle = "rgba(160,120,70,.25)";
-  ctx.fillRect(FARM.x * TILE, FARM.y * TILE, FARM.w * TILE, FARM.h * TILE);
-  // Ao
-  const px = POND.x * TILE, py = POND.y * TILE, pw = POND.w * TILE, ph = POND.h * TILE;
-  ctx.fillStyle = "#4a90d9";
-  roundRect(px + 4, py + 4, pw - 8, ph - 8, 18, true);
-  ctx.fillStyle = "rgba(255,255,255,.25)";
-  roundRect(px + 12, py + 10, pw * 0.4, 6, 3, true);
-}
-
-function drawFarmTiles() {
-  for (const k in S.tiles) {
-    const [x, y] = k.split(",").map(Number);
-    const t = S.tiles[k];
-    const px = x * TILE, py = y * TILE;
-    // Đất
-    ctx.fillStyle = t.w ? "#5b3a1e" : "#8a5a2b";
-    roundRect(px + 2, py + 2, TILE - 4, TILE - 4, 5, true);
-    ctx.strokeStyle = "rgba(0,0,0,.15)";
-    ctx.beginPath();
-    ctx.moveTo(px + 6, py + 13); ctx.lineTo(px + TILE - 6, py + 13);
-    ctx.moveTo(px + 6, py + 26); ctx.lineTo(px + TILE - 6, py + 26);
-    ctx.stroke();
-    // Cây
-    if (t.c) drawCrop(px, py, t.c);
-  }
-}
-
-function drawCrop(px, py, c) {
-  const def = CROPS[c.id];
-  const ready = cropReady(c);
-  const cx = px + TILE / 2, base = py + TILE - 8;
-  if (ready) {
-    // Cây trưởng thành + hiệu ứng lấp lánh
-    ctx.fillStyle = def.leaf;
-    ctx.beginPath(); ctx.ellipse(cx, base - 14, 12, 9, 0, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = def.color;
-    ctx.beginPath(); ctx.arc(cx, base - 18, 7, 0, Math.PI * 2); ctx.fill();
-    const tw = Math.sin(performance.now() / 300 + px) * 0.5 + 0.5;
-    if (tw > 0.6) { ctx.fillStyle = "rgba(255,255,180,.9)"; ctx.fillRect(px + 6, py + 6, 4, 4); }
+  // Đi bộ: vung tay chân
+  if (playerGroup.userData.moving) {
+    const sw = Math.sin(time * 10) * 0.5;
+    playerGroup.userData.legs[0].rotation.x = sw;
+    playerGroup.userData.legs[1].rotation.x = -sw;
+    playerGroup.position.y = Math.abs(Math.sin(time * 10)) * 0.12;
   } else {
-    // Theo giai đoạn: mầm → cây nhỏ → gần chín
-    const hgt = 4 + (c.stage / def.days) * 16;
-    ctx.strokeStyle = def.leaf; ctx.lineWidth = 3;
-    ctx.beginPath(); ctx.moveTo(cx, base); ctx.lineTo(cx, base - hgt); ctx.stroke();
-    ctx.fillStyle = def.leaf;
-    const ls = 3 + (c.stage / def.days) * 5;
-    ctx.beginPath(); ctx.ellipse(cx - ls, base - hgt, ls * 0.7, ls * 0.4, -0.6, 0, Math.PI * 2); ctx.fill();
-    ctx.beginPath(); ctx.ellipse(cx + ls, base - hgt, ls * 0.7, ls * 0.4, 0.6, 0, Math.PI * 2); ctx.fill();
-    ctx.lineWidth = 1;
+    playerGroup.userData.legs[0].rotation.x = 0;
+    playerGroup.userData.legs[1].rotation.x = 0;
+    playerGroup.position.y = 0;
   }
-  // Giọt nước nếu đã tưới hôm nay
-  if (c.w && !ready) { ctx.font = "10px sans-serif"; ctx.fillText("💧", px + TILE - 12, py + 10); }
+
+  // Ô đang nhắm
+  const ft = facingTile();
+  highlightMesh.position.set(t2x(ft.x), 0.06, t2z(ft.y));
+
+  // Cây trưởng thành lắc lư
+  for (const [, entry] of plotMeshes) {
+    const holder = entry.cropHolder;
+    if (holder.children.length) {
+      const ready = holder.userData?.ready;
+      holder.rotation.z = ready ? Math.sin(time * 3 + holder.position.x) * 0.06 : 0;
+    }
+    holder.userData = holder.userData || {};
+  }
+
+  // Camera bám theo nhân vật
+  const target = new THREE.Vector3(px, 1.5, pz);
+  const dir = new THREE.Vector3(0, 1.35, 1).normalize();
+  const desired = target.clone().add(dir.multiplyScalar(camDist));
+  camera.position.lerp(desired, 0.12);
+  camera.lookAt(target);
+
+  renderer.render(scene, camera);
 }
 
-function drawBuildings() {
-  // Nhà
-  const hx = HOUSE.x * TILE, hy = HOUSE.y * TILE, hw = HOUSE.w * TILE, hh = HOUSE.h * TILE;
-  ctx.fillStyle = "#b5651d"; roundRect(hx, hy + 20, hw, hh - 20, 4, true);          // tường
-  ctx.fillStyle = "#8b3a1a";                                                          // mái
-  ctx.beginPath();
-  ctx.moveTo(hx - 8, hy + 26); ctx.lineTo(hx + hw / 2, hy - 12); ctx.lineTo(hx + hw + 8, hy + 26);
-  ctx.closePath(); ctx.fill();
-  ctx.fillStyle = "#6b4423"; roundRect(hx + hw / 2 - 14, hy + hh - 34, 28, 34, 4, true); // cửa
-  ctx.fillStyle = "#9fd48a"; ctx.font = "13px sans-serif"; ctx.fillText("🏠", hx + hw / 2 - 8, hy + hh - 12);
-  ctx.fillStyle = "#fff"; ctx.font = "bold 10px sans-serif";
-  ctx.fillText("Nhà của bạn", hx + 22, hy + hh + 14);
-  // Cửa hàng
-  const sx = SHOP.x * TILE, sy = SHOP.y * TILE, sw = SHOP.w * TILE, sh = SHOP.h * TILE;
-  ctx.fillStyle = "#7a5230"; roundRect(sx, sy + 14, sw, sh - 14, 4, true);
-  ctx.fillStyle = "#d9534f";
-  ctx.beginPath(); ctx.moveTo(sx - 6, sy + 18); ctx.lineTo(sx + sw / 2, sy - 10); ctx.lineTo(sx + sw + 6, sy + 18); ctx.closePath(); ctx.fill();
-  ctx.fillStyle = "#fff"; ctx.font = "bold 11px sans-serif"; ctx.fillText("🏪 CỬA HÀNG", sx + 18, sy + 38);
-  // Quầy bán hàng (nơi tương tác)
-  const qx = SHOP_COUNTER.x * TILE, qy = SHOP_COUNTER.y * TILE;
-  ctx.fillStyle = "#a0713f"; roundRect(qx, qy, TILE, TILE - 6, 4, true);
-  ctx.fillStyle = "#f5c542"; ctx.font = "16px sans-serif"; ctx.fillText("💰", qx + 11, qy + 22);
-
-  // Bảng chỉ dẫn
-  ctx.fillStyle = "rgba(0,0,0,.45)"; roundRect(W / 2 - 150, H - 30, 300, 24, 8, true);
-  ctx.fillStyle = "#fff"; ctx.font = "12px sans-serif"; ctx.textAlign = "center";
-  ctx.fillText("🏠 Đến cửa nhà để ngủ · 🏪 Đến quầy để mua/bán", W / 2, H - 13);
-  ctx.textAlign = "left";
+/* ============================================================
+   KHỞI ĐỘNG
+   ============================================================ */
+function startGame(state) {
+  S = state;
+  $("auth-screen").classList.add("hidden");
+  $("game-root").classList.remove("hidden");
+  if (!started) {
+    started = true;
+    initThree();
+    syncPlots();
+    // Đặt camera ngay lần đầu
+    camera.position.set(w2x(S.px), 14, w2z(S.py) + 16);
+    requestAnimationFrame((t) => { lastT = t; loop(t); });
+  } else {
+    syncPlots();
+  }
+  renderToolbar();
+  updateHUD();
 }
 
-function drawPlayer() {
-  const px = S.px, py = S.py;
-  const bob = (Math.floor(performance.now() / 150) % 2) * 2;
-  // bóng
-  ctx.fillStyle = "rgba(0,0,0,.25)";
-  ctx.beginPath(); ctx.ellipse(px + TILE / 2, py + TILE - 4, 12, 5, 0, 0, Math.PI * 2); ctx.fill();
-  // chân
-  ctx.fillStyle = "#3a5a8a";
-  ctx.fillRect(px + 12, py + 28, 6, 8 - bob / 2);
-  ctx.fillRect(px + 22, py + 28, 6, 8 - (2 - bob) / 2);
-  // thân (áo)
-  ctx.fillStyle = "#e04b3a";
-  roundRect(px + 10, py + 16, 20, 14, 4, true);
-  // đầu
-  ctx.fillStyle = "#f0c8a0";
-  ctx.beginPath(); ctx.arc(px + TILE / 2, py + 10, 9, 0, Math.PI * 2); ctx.fill();
-  // mũ nông dân
-  ctx.fillStyle = "#f5c542";
-  ctx.beginPath(); ctx.ellipse(px + TILE / 2, py + 4, 12, 5, 0, 0, Math.PI * 2); ctx.fill();
-  ctx.beginPath(); ctx.ellipse(px + TILE / 2, py - 1, 6, 4, 0, 0, Math.PI * 2); ctx.fill();
-  // mắt theo hướng
-  ctx.fillStyle = "#222";
-  const ex = px + TILE / 2 + facing.dx * 3, ey = py + 10 + facing.dy * 2;
-  ctx.fillRect(ex - 3, ey, 2, 2); ctx.fillRect(ex + 2, ey, 2, 2);
+initSupabase();
+if (!supabaseConfigured() && loadLocal()) {
+  $("cloud-status").textContent = "💾 Có tiến trình đã lưu trên máy này — chọn \"Chơi thử\" để tiếp tục.";
 }
 
-function drawTileHighlight() {
-  const { x, y } = facingTile();
-  ctx.strokeStyle = "rgba(255,255,255,.6)";
-  ctx.lineWidth = 2;
-  ctx.strokeRect(x * TILE + 1, y * TILE + 1, TILE - 2, TILE - 2);
-  ctx.lineWidth = 1;
-}
-
-function roundRect(x, y, w, h, r, fill) {
-  ctx.beginPath();
-  ctx.moveTo(x + r, y);
-  ctx.arcTo(x + w, y, x + w, y + h, r);
-  ctx.arcTo(x + w, y + h, x, y + h, r);
-  ctx.arcTo(x, y + h, x, y, r);
-  ctx.arcTo(x, y, x + w, y, r);
-  ctx.closePath();
-  if (fill) ctx.fill(); else ctx.stroke();
-}
-
-/* ---- Âm thanh nhỏ bằng WebAudio ---- */
+/* Âm thanh nhỏ bằng WebAudio */
 let audioCtx = null;
 function sfx(type) {
   try {
@@ -698,20 +900,11 @@ function sfx(type) {
       harvest: [660, 0.12, "sine"], buy: [880, 0.1, "sine"], sell: [520, 0.12, "sine"],
       levelup: [1040, 0.25, "sine"],
     };
-    const [freq, dur, wave] = map[type] || [440, 0.1, "sine"];
-    o.type = wave; o.frequency.value = freq;
+    const m = map[type] || [440, 0.1, "sine"];
+    o.type = m[2]; o.frequency.value = m[0];
     g.gain.setValueAtTime(0.08, audioCtx.currentTime);
-    g.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + dur);
+    g.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + m[1]);
     o.connect(g); g.connect(audioCtx.destination);
-    o.start(); o.stop(audioCtx.currentTime + dur);
+    o.start(); o.stop(audioCtx.currentTime + m[1]);
   } catch (_) {}
-}
-
-/* ============================================================
-   KHỞI ĐỘNG
-   ============================================================ */
-initSupabase();
-if (!supabaseConfigured() && loadLocal()) {
-  // Có save cũ trên máy → vào thẳng chế độ khách nếu người dùng muốn (vẫn hiện màn hình auth)
-  $("cloud-status").textContent = "💾 Có tiến trình đã lưu trên máy này — chọn \"Chơi thử\" để tiếp tục.";
 }
