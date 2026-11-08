@@ -112,6 +112,16 @@ body {
 }
 .mbtn small { font-size: 9px; font-weight: 700; margin-top: -2px; }
 .mbig { width: 74px; height: 74px; font-size: 30px; background: rgba(126,200,80,.5); border-color: rgba(126,200,80,.9); }
+.mdia { width: 58px; height: 58px; background: rgba(111,177,232,.45); border-color: rgba(111,177,232,.85); }
+.sleep-overlay {
+  position: absolute; inset: 0; z-index: 45;
+  background: rgba(5, 8, 25, .82);
+  display: flex; align-items: center; justify-content: center;
+}
+.sleep-box { text-align: center; font-size: 22px; font-weight: 700; }
+.sleep-box .zzz { font-size: 64px; animation: zzz-float 1.2s ease-in-out infinite; }
+@keyframes zzz-float { 0%, 100% { transform: translateY(0) rotate(-4deg); } 50% { transform: translateY(-14px) rotate(4deg); } }
+.sleep-count { margin-top: 10px; font-size: 18px; color: #f7d774; }
 .mrow { display: flex; gap: 10px; }
 
 /* ===== Panels (shop/bag/sleep) ===== */
@@ -201,6 +211,8 @@ body {
   .mbtn small { display: none; }
   .mbig { width: 64px; height: 64px; font-size: 24px; }
   .mbig small { display: block; font-size: 9px; }
+  .mdia { width: 48px; height: 48px; font-size: 18px; }
+  .mdia small { display: block; font-size: 8px; }
   .mrow { gap: 5px; flex-wrap: wrap; justify-content: flex-end; max-width: 56vw; }
   .toast { bottom: 130px; }
 }
@@ -211,4 +223,5 @@ body {
   .mbtn { width: 46px; height: 46px; font-size: 18px; }
   .mbtn small { display: none; }
   .mbig { width: 56px; height: 56px; font-size: 22px; }
+  .mdia { width: 46px; height: 46px; font-size: 18px; }
 }

@@ -12,6 +12,8 @@ const PLAYER_SPEED = 2.6;
 const ENERGY = { till: 4, water: 2, plant: 3, harvest: 2, feedPond: 3, feedAnimal: 1 };
 const START_GOLD = 500;
 const FISH_MAX = 8;
+const WATER_NEEDED = 5;   // tưới đủ 5 lần thì cây chín
+const DIAMOND_PER_LEVEL = 10;
 
 const CROPS = {
   turnip:  { name: "Củ cải",  emoji: "🥬", seedCost: 20,  sell: 40,  days: 2, xp: 4,  level: 1, leaf: 0x7ec850 },
@@ -88,6 +90,7 @@ function freshState() {
     v: 2, gold: START_GOLD, level: 1, xp: 0, day: 1, energy: 100,
     inv: { seed_turnip: 6 }, tiles: {}, px: 8 * TILE, py: 8 * TILE,
     fish: [], animals: [], decor: {}, gender: "female",
+    diamonds: 0, sleepTime: 1,
   };
 }
 const xpNeed = (lv) => lv * 50;
@@ -217,6 +220,8 @@ function migrate(st) {
   m.animals = Array.isArray(st.animals) ? st.animals : [];
   m.decor = st.decor && typeof st.decor === "object" ? st.decor : {};
   m.gender = st.gender === "male" ? "male" : "female";
+  m.diamonds = st.diamonds || 0;
+  m.sleepTime = st.sleepTime > 0 ? st.sleepTime : 1;
   m.v = 2;
   return m;
 }
@@ -614,83 +619,91 @@ function buildCropMesh(holder, c) {
     const ch = holder.children.pop();
     ch.traverse?.((o) => { o.geometry?.dispose(); o.material?.dispose?.(); });
   }
+  holder.rotation.z = 0;
+  holder.userData = {};
   if (!c) return;
   const def = CROPS[c.id];
-  const ready = c.stage >= def.days;
-  const prog = Math.min(1, c.stage / def.days);
-
-  if (!ready) {
-    // Giai đoạn đang lớn: mầm + lá theo màu cây, cao dần
-    const stemH = 0.3 + prog * 0.9;
-    const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.09, stemH, 6), mat(def.leaf));
-    stem.position.y = stemH / 2 + 0.1;
-    const ls = 0.14 + prog * 0.22;
-    const leafL = new THREE.Mesh(new THREE.SphereGeometry(ls, 8, 6), mat(def.leaf));
-    leafL.position.set(-ls, stemH + 0.05, 0); leafL.scale.set(1.4, 0.6, 1);
-    const leafR = leafL.clone(); leafR.position.x = ls;
-    holder.add(stem, leafL, leafR);
-  } else {
-    // Trưởng thành: HÌNH DẠNG RIÊNG theo loại
-    buildReadyCrop(holder, c.id);
-  }
+  const ready = c.stage >= WATER_NEEDED;
+  const prog = Math.max(0.12, Math.min(1, c.stage / WATER_NEEDED));
+  // Cây lớn dần theo số lần tưới, giữ đúng dáng cây thật của từng loại
+  holder.scale.setScalar(0.4 + 0.6 * prog);
+  buildSpeciesPlant(holder, c.id, ready, prog);
   if (c.w && !ready) {
     const drop = new THREE.Mesh(new THREE.OctahedronGeometry(0.16), mat(0x6ec6ff, { transparent: true, opacity: 0.9 }));
-    drop.position.y = 1.9;
+    drop.position.y = 2.1;
     holder.add(drop);
   }
 }
 
-function buildReadyCrop(holder, id) {
+/* Mỗi loài có dáng cây thật riêng: thân/lá luôn có, quả chỉ hiện khi chín */
+function buildSpeciesPlant(holder, id, ready, prog) {
   const M = mat;
   if (id === "turnip") {
-    // Củ cải: củ trắng nhô khỏi đất + lá to
     const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.34, 12, 10), M(0xe8e8f5));
-    bulb.position.y = 0.2;
-    bulb.scale.set(1, 0.8, 1); bulb.castShadow = true;
+    bulb.position.y = 0.2; bulb.scale.set(1, 0.8, 1); bulb.castShadow = true;
     const leaf1 = new THREE.Mesh(new THREE.SphereGeometry(0.3, 8, 6), M(0x7ec850));
     leaf1.position.set(-0.12, 0.62, 0); leaf1.scale.set(0.6, 1.2, 0.6);
     const leaf2 = leaf1.clone(); leaf2.position.x = 0.12; leaf2.rotation.z = 0.5;
     holder.add(bulb, leaf1, leaf2);
   } else if (id === "potato") {
-    // Khoai tây: bụi thấp + củ lộ đất
     const bush = new THREE.Mesh(new THREE.SphereGeometry(0.4, 10, 8), M(0x3f6d28));
     bush.position.y = 0.45; bush.scale.set(1.3, 0.8, 1.3); bush.castShadow = true;
-    const p1 = new THREE.Mesh(new THREE.SphereGeometry(0.16, 8, 6), M(0xc9a15f));
-    p1.position.set(-0.3, 0.14, 0.2);
-    const p2 = p1.clone(); p2.position.set(0.28, 0.14, -0.15);
-    holder.add(bush, p1, p2);
+    holder.add(bush);
+    if (ready) {
+      const p1 = new THREE.Mesh(new THREE.SphereGeometry(0.16, 8, 6), M(0xc9a15f));
+      p1.position.set(-0.3, 0.14, 0.2);
+      const p2 = p1.clone(); p2.position.set(0.28, 0.14, -0.15);
+      holder.add(p1, p2);
+    }
   } else if (id === "corn") {
-    // Ngô: thân cao + lá dài + bắp ngô vàng
+    // Cây bắp: thân cao + lá dài cong + bắp ngô sát thân
     const stalk = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.1, 1.7, 6), M(0x4c8a35));
     stalk.position.y = 0.95; stalk.castShadow = true;
-    const leafL = new THREE.Mesh(new THREE.ConeGeometry(0.12, 0.7, 4), M(0x4c8a35));
-    leafL.position.set(-0.25, 1.0, 0); leafL.rotation.z = 1.0;
-    const leafR = leafL.clone(); leafR.position.x = 0.25; leafR.rotation.z = -1.0;
-    const cob = new THREE.Mesh(new THREE.CapsuleGeometry(0.16, 0.35, 4, 8), M(0xf5c542));
-    cob.position.set(0.18, 1.15, 0); cob.rotation.z = 0.5; cob.castShadow = true;
-    holder.add(stalk, leafL, leafR, cob);
+    const leafL = new THREE.Mesh(new THREE.ConeGeometry(0.12, 0.75, 4), M(0x4c8a35));
+    leafL.position.set(-0.26, 1.05, 0); leafL.rotation.z = 1.0;
+    const leafR = new THREE.Mesh(new THREE.ConeGeometry(0.12, 0.75, 4), M(0x5da23f));
+    leafR.position.set(0.26, 0.8, 0); leafR.rotation.z = -1.0;
+    holder.add(stalk, leafL, leafR);
+    if (ready) {
+      const cob = new THREE.Mesh(new THREE.CapsuleGeometry(0.15, 0.38, 4, 8), M(0xf5c542));
+      cob.position.set(0.2, 1.1, 0); cob.rotation.z = 0.45; cob.castShadow = true;
+      const husk = new THREE.Mesh(new THREE.ConeGeometry(0.12, 0.3, 4), M(0x8fca5a));
+      husk.position.set(0.28, 0.86, 0); husk.rotation.z = 0.45;
+      holder.add(cob, husk);
+    }
   } else if (id === "tomato") {
-    // Cà chua: cắm sào + chùm quả đỏ
     const stake = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 1.5, 5), M(0x8a6a3a));
     stake.position.y = 0.85;
     const vine = new THREE.Mesh(new THREE.SphereGeometry(0.35, 10, 8), M(0x3f7a2e));
     vine.position.y = 1.0; vine.scale.set(1, 1.2, 1);
-    const t1 = new THREE.Mesh(new THREE.SphereGeometry(0.17, 10, 8), M(0xe04b3a));
-    t1.position.set(-0.2, 0.85, 0.12); t1.castShadow = true;
-    const t2 = t1.clone(); t2.position.set(0.18, 1.15, -0.1);
-    const t3 = t1.clone(); t3.position.set(0.05, 0.7, -0.2);
-    holder.add(stake, vine, t1, t2, t3);
+    holder.add(stake, vine);
+    if (ready) {
+      const t1 = new THREE.Mesh(new THREE.SphereGeometry(0.17, 10, 8), M(0xe04b3a));
+      t1.position.set(-0.2, 0.85, 0.12); t1.castShadow = true;
+      const t2 = t1.clone(); t2.position.set(0.18, 1.15, -0.1);
+      const t3 = t1.clone(); t3.position.set(0.05, 0.7, -0.2);
+      holder.add(t1, t2, t3);
+    } else if (prog > 0.5) {
+      const g1 = new THREE.Mesh(new THREE.SphereGeometry(0.1, 8, 6), M(0x7fc25e));
+      g1.position.set(-0.16, 0.9, 0.1);
+      holder.add(g1);
+    }
   } else if (id === "pumpkin") {
-    // Bí ngô: quả to cam + dây leo
-    const pumpkin = new THREE.Mesh(new THREE.SphereGeometry(0.55, 14, 10), M(0xe88b1a));
-    pumpkin.position.y = 0.42; pumpkin.scale.set(1, 0.75, 1); pumpkin.castShadow = true;
-    const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.09, 0.25, 6), M(0x3a6d28));
-    stem.position.y = 0.85;
     const vine = new THREE.Mesh(new THREE.SphereGeometry(0.22, 8, 6), M(0x3a6d28));
     vine.position.set(-0.55, 0.12, 0.3); vine.scale.set(1.6, 0.4, 1);
-    holder.add(pumpkin, stem, vine);
+    holder.add(vine);
+    if (ready) {
+      const pumpkin = new THREE.Mesh(new THREE.SphereGeometry(0.55, 14, 10), M(0xe88b1a));
+      pumpkin.position.y = 0.42; pumpkin.scale.set(1, 0.75, 1); pumpkin.castShadow = true;
+      const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.09, 0.25, 6), M(0x3a6d28));
+      stem.position.y = 0.85;
+      holder.add(pumpkin, stem);
+    } else {
+      const bud = new THREE.Mesh(new THREE.SphereGeometry(0.14, 8, 6), M(0x7fae3f));
+      bud.position.set(0.2, 0.14, 0);
+      holder.add(bud);
+    }
   } else if (id === "carrot") {
-    // Cà rốt: củ cam nhô khỏi đất (chóp hướng lên) + ngọn lá tán
     const root = new THREE.Mesh(new THREE.ConeGeometry(0.26, 0.55, 10), M(0xe8791a));
     root.position.y = 0.15; root.castShadow = true;
     const f1 = new THREE.Mesh(new THREE.SphereGeometry(0.2, 8, 6), M(0x2f8f3a));
@@ -700,6 +713,7 @@ function buildReadyCrop(holder, id) {
     holder.add(root, f1, f2, f3);
   }
 }
+
 
 /* ---------- Cá 3D bơi trong ao ---------- */
 const fishMeshes = [];
@@ -719,15 +733,9 @@ function syncFish() {
   const pcz = (t2z(POND.y) + t2z(POND.y + POND.h - 1)) / 2;
   S.fish.forEach((f, i) => {
     const def = FISH[f.id];
-    const g = new THREE.Group();
+    const g = buildFishMesh(def.color);
     const scale = 0.55 + Math.min(1, f.stage / def.days) * 0.75;
-    const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.16 * scale, 0.42 * scale, 4, 8), mat(def.color));
-    body.rotation.z = Math.PI / 2; body.castShadow = false;
-    const tail = new THREE.Mesh(new THREE.ConeGeometry(0.14 * scale, 0.3 * scale, 4), mat(def.color));
-    tail.position.x = -0.42 * scale; tail.rotation.z = Math.PI / 2;
-    const fin = new THREE.Mesh(new THREE.ConeGeometry(0.08 * scale, 0.2 * scale, 4), mat(0xffffff));
-    fin.position.y = 0.16 * scale;
-    g.add(body, tail, fin);
+    g.scale.setScalar(scale);
     const radius = 0.7 + (i % 3) * 0.75;
     const depth = -0.55 - (i % 3) * 0.22;
     fishMeshes.push({
@@ -738,6 +746,33 @@ function syncFish() {
     scene.add(g);
   });
 }
+/* Cá trông như cá thật: thân dẹt thoi + đuôi tam giác vẫy + vây lưng + mắt */
+function buildFishMesh(color) {
+  const g = new THREE.Group();
+  const M = mat;
+  // Thân thoi dẹt
+  const body = new THREE.Mesh(new THREE.SphereGeometry(0.5, 14, 10), M(color));
+  body.scale.set(1.1, 0.42, 0.22);
+  body.castShadow = false;
+  // Đầu nhọn nhẹ
+  const nose = new THREE.Mesh(new THREE.ConeGeometry(0.2, 0.35, 8), M(color));
+  nose.rotation.z = -Math.PI / 2; nose.position.set(0.55, 0, 0);
+  // Đuôi tam giác (vẫy được)
+  const tail = new THREE.Mesh(new THREE.ConeGeometry(0.22, 0.42, 3), M(color));
+  tail.rotation.z = Math.PI / 2; tail.position.set(-0.62, 0, 0); tail.scale.z = 0.18;
+  g.userData.tail = tail;
+  // Vây lưng + vây bụng
+  const dorsal = new THREE.Mesh(new THREE.ConeGeometry(0.12, 0.28, 3), M(color));
+  dorsal.position.set(-0.02, 0.2, 0); dorsal.scale.z = 0.35;
+  const finB = new THREE.Mesh(new THREE.ConeGeometry(0.1, 0.22, 3), M(color));
+  finB.position.set(0.1, -0.14, 0); finB.rotation.x = Math.PI; finB.scale.z = 0.35;
+  // Mắt
+  const eL = new THREE.Mesh(new THREE.SphereGeometry(0.045, 6, 6), M(0x1a1a1a));
+  eL.position.set(0.38, 0.06, 0.1);
+  const eR = eL.clone(); eR.position.z = -0.1;
+  g.add(body, nose, tail, dorsal, finB, eL, eR);
+  return g;
+}
 function updateFish(t) {
   for (const f of fishMeshes) {
     f.angle += f.speed * 0.016;
@@ -745,6 +780,8 @@ function updateFish(t) {
     const z = f.cz + Math.sin(f.angle) * f.radius * 0.55;
     f.group.position.set(x, f.depth + Math.sin(t * 2 + f.radius * 5) * 0.05, z);
     f.group.rotation.y = -f.angle + Math.PI / 2;
+    // Đuôi vẫy + lưng nhấp nhô
+    if (f.group.userData.tail) f.group.userData.tail.rotation.y = Math.sin(t * 9) * 0.4;
     if (f.ready) f.group.position.y += Math.sin(t * 4) * 0.04;
   }
 }
@@ -940,6 +977,7 @@ window.addEventListener("keydown", (e) => {
     if (i < TOOLS.length && slotAvailable(i)) { selectedSlot = i; renderToolbar(); }
   }
   if (k === " " || k === "e") doAction();
+  if (k === "x") useDiamond();
   if (k === "b") togglePanel("shop-panel");
   if (k === "q") togglePanel("bag-panel");
   if (k === "g") togglePanel("build-panel");
@@ -1005,6 +1043,7 @@ canvas.addEventListener("wheel", (e) => {
 }, { passive: true });
 
 $("btn-action").addEventListener("click", () => doAction());
+$("btn-diamond-m").addEventListener("click", () => useDiamond());
 $("btn-shop-m").addEventListener("click", () => togglePanel("shop-panel"));
 $("btn-bag-m").addEventListener("click", () => togglePanel("bag-panel"));
 $("btn-sleep-m").addEventListener("click", () => trySleep());
@@ -1108,9 +1147,19 @@ function doAction() {
     useEnergy(ENERGY.till); sfx("till");
   } else if (tool.id === "water") {
     if (!tile?.t) { toast("Cần cuốc đất trước đã!"); return; }
+    if (tile.c) {
+      // Cây cần tưới đủ WATER_NEEDED lần mới chín
+      if (cropReady(tile.c)) { toast("Cây đã chín — thu hoạch thôi! 🌾"); return; }
+      tile.c.stage = Math.min(WATER_NEEDED, tile.c.stage + 1);
+      tile.c.w = 1;
+      useEnergy(ENERGY.water); sfx("water");
+      if (cropReady(tile.c)) toast("🌿 Cây đã đủ nước — chín rồi! Thu hoạch đi!");
+      else toast("💧 Cây đã tưới " + tile.c.stage + "/" + WATER_NEEDED + " lần");
+      syncPlots(); updateHUD(); saveGame();
+      return;
+    }
     if (tile.w) { toast("Đã tưới nước rồi."); return; }
     tile.w = 1;
-    if (tile.c) tile.c.w = 1;
     useEnergy(ENERGY.water); sfx("water");
   } else if (tool.seed) {
     if (!tile?.t) { toast("Cần cuốc đất trước khi gieo hạt!"); return; }
@@ -1125,7 +1174,22 @@ function doAction() {
   syncPlots();
   updateHUD();
 }
-function cropReady(c) { return c.stage >= CROPS[c.id].days; }
+function cropReady(c) { return c.stage >= WATER_NEEDED; }
+
+// 💎 Dùng kim cương: cây đang lớn chín ngay lập tức
+function useDiamond() {
+  if (!S || authScreenVisible()) return;
+  const { x, y } = facingTile();
+  const tile = S.tiles[keyOf(x, y)];
+  if (!tile?.c) { toast("Đứng cạnh cây đang lớn mới dùng kim cương được!"); return; }
+  if (cropReady(tile.c)) { toast("Cây này đã chín rồi — thu hoạch thôi! 🌾"); return; }
+  if ((S.diamonds || 0) < 1) { toast("Hết kim cương! Lên cấp sẽ được tặng 💎"); return; }
+  S.diamonds--;
+  tile.c.stage = WATER_NEEDED;
+  sfx("levelup");
+  toast("💎 Kim cương phát sáng — cây chín ngay lập tức! 🌾");
+  syncPlots(); updateHUD(); saveGame();
+}
 
 function harvest(tile) {
   const def = CROPS[tile.c.id];
@@ -1133,7 +1197,7 @@ function harvest(tile) {
   const key = "crop_" + tile.c.id;
   S.inv[key] = (S.inv[key] || 0) + 1;
   gainXP(def.xp);
-  if (def.regrow) { tile.c.stage = def.days - def.regrow; tile.c.w = 0; }
+  if (def.regrow) { tile.c.stage = WATER_NEEDED - 2; tile.c.w = 0; } // mọc lại: cần tưới thêm 2 lần
   else { tile.c = null; tile.w = 0; tile.t = 1; }
   useEnergy(ENERGY.harvest); sfx("harvest");
   toast("Thu hoạch được 1 " + def.name + "! (+" + def.xp + " XP)");
@@ -1146,6 +1210,7 @@ function gainXP(n) {
   while (S.xp >= xpNeed(S.level)) {
     S.xp -= xpNeed(S.level);
     S.level++;
+    S.diamonds = (S.diamonds || 0) + DIAMOND_PER_LEVEL;
     const unlocked = [
       ...CROP_IDS.filter((id) => CROPS[id].level === S.level).map((id) => CROPS[id].name),
       ...FISH_IDS.filter((id) => FISH[id].level === S.level).map((id) => "cá " + FISH[id].name),
@@ -1160,6 +1225,7 @@ function showLevelUp(lv, unlocked) {
   el.classList.remove("hidden");
   setTimeout(() => el.classList.add("hidden"), 2600);
   if (unlocked.length) toast("🌱 Mở khóa: " + unlocked.join(", ") + "!");
+  toast("💎 Nhận " + DIAMOND_PER_LEVEL + " kim cương thưởng lên cấp!");
   sfx("levelup");
 }
 
@@ -1168,10 +1234,26 @@ function showLevelUp(lv, unlocked) {
    ============================================================ */
 function trySleep() { if (!authScreenVisible()) togglePanel("sleep-panel"); }
 function doSleep() {
-  let grew = 0, fishGrew = 0, eggs = 0, milk = 0;
+  if (sleeping || !S) return;
+  sleeping = true;
+  closePanels();
+  // Màn hình ngủ + đếm giây: lần đầu 1s, mỗi lần sau +1s
+  const ov = $("sleep-overlay");
+  $("sleep-count").textContent = S.sleepTime + " giây";
+  ov.classList.remove("hidden");
+  setTimeout(() => {
+    applySleep();
+    sleeping = false;
+    ov.classList.add("hidden");
+    S.sleepTime = Math.min(15, S.sleepTime + 1); // lần sau ngủ lâu hơn 1s
+    saveGame(); updateHUD();
+  }, S.sleepTime * 1000);
+}
+function applySleep() {
+  let fishGrew = 0, eggs = 0, milk = 0;
+  // Cây KHÔNG lớn theo ngày nữa — chín theo số lần tưới. Chỉ làm khô đất.
   for (const k in S.tiles) {
     const t = S.tiles[k];
-    if (t.c && !cropReady(t.c) && t.c.w) { t.c.stage = Math.min(t.c.stage + 1, CROPS[t.c.id].days); grew++; }
     if (t.c) t.c.w = 0;
     t.w = 0;
   }
@@ -1192,21 +1274,27 @@ function doSleep() {
     a.fed = false;
   }
   S.day++; S.energy = 100;
-  closePanels();
   const parts = [];
-  if (grew) parts.push(grew + " cây lớn");
   if (fishGrew) parts.push(fishGrew + " cá lớn");
   if (eggs) parts.push(eggs + " 🥚");
   if (milk) parts.push(milk + " 🥛");
-  toast("☀️ Ngày mới! " + (parts.length ? parts.join(", ") : "Đừng quên chăm sóc nông trại!"));
-  syncPlots(); syncFish(); syncAnimals(); saveGame(); updateHUD();
+  toast("☀️ Ngày mới! " + (parts.length ? parts.join(", ") : "Đừng quên cho cá & vật nuôi ăn!"));
+  syncPlots(); syncFish(); syncAnimals();
 }
+let sleeping = false;
 $("btn-sleep-confirm").onclick = doSleep;
+$("btn-sleep-diamond").onclick = () => {
+  if ((S?.diamonds || 0) < 1) { toast("Cần 1 💎 để ngủ nhanh!"); return; }
+  S.diamonds--;
+  S.sleepTime = 1; // quay lại từ đầu
+  updateHUD();
+  doSleep();
+};
 const sleepObserver = new MutationObserver(() => {
   if (!$("sleep-panel").classList.contains("hidden") && S) {
     const ready = Object.values(S.tiles).filter((t) => t.c && cropReady(t.c)).length;
     const fishReady = S.fish.filter((f) => f.stage >= FISH[f.id].days).length;
-    $("sleep-info").textContent = `Ruộng: ${ready} cây sẵn sàng thu hoạch · Ao: ${fishReady} cá bắt được · Đừng quên cho cá & vật nuôi ăn!`;
+    $("sleep-info").textContent = `Ruộng: ${ready} cây chín · Ao: ${fishReady} cá bắt được · Thời gian ngủ hiện tại: ${S.sleepTime}s (mỗi lần +1s) · Dùng 1 💎 để ngủ lại nhanh như lúc đầu`;
   }
 });
 sleepObserver.observe($("sleep-panel"), { attributes: true });
@@ -1229,9 +1317,9 @@ function togglePanel(id) {
 }
 function closePanels() {
   ["shop-panel", "bag-panel", "sleep-panel", "pond-panel", "coop-panel", "build-panel"].forEach((id) => $(id).classList.add("hidden"));
-  buildMode = null;
+  // Lưu ý: KHÔNG xoá buildMode ở đây — đặt trang trí cần giữ chế độ khi đóng panel
 }
-document.querySelectorAll(".panel-close").forEach((b) => (b.onclick = () => closePanels()));
+document.querySelectorAll(".panel-close").forEach((b) => (b.onclick = () => { buildMode = null; closePanels(); }));
 
 function sectionTitle(txt) {
   const d = document.createElement("div");
@@ -1249,7 +1337,7 @@ function renderShop() {
   CROP_IDS.forEach((id) => {
     const c = CROPS[id];
     const locked = c.level > S.level;
-    list.appendChild(shopRow(c.emoji, "Hạt " + c.name, `${c.days} ngày · bán ${c.sell}💰 · ${c.xp} XP${c.regrow ? " · mọc lại 🌿" : ""}${locked ? " · 🔒 Lv." + c.level : ""}`, c.seedCost, locked, () => buySeed(id)));
+    list.appendChild(shopRow(c.emoji, "Hạt " + c.name, `tưới ${WATER_NEEDED} lần là chín · bán ${c.sell}💰 · ${c.xp} XP${c.regrow ? " · mọc lại 🌿" : ""}${locked ? " · 🔒 Lv." + c.level : ""}`, c.seedCost, locked, () => buySeed(id)));
   });
   // Cá giống
   list.appendChild(sectionTitle("🐟 Cá giống (thả vào ao)"));
@@ -1497,6 +1585,7 @@ function updateHUD() {
   $("hud-day").textContent = S.day;
   $("hud-level").textContent = S.level;
   $("hud-energy").textContent = S.energy;
+  $("hud-diamond").textContent = S.diamonds || 0;
   const need = xpNeed(S.level);
   $("xp-bar").style.width = Math.min(100, (S.xp / need) * 100) + "%";
   $("xp-text").textContent = `${S.xp}/${need} XP`;

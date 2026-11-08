@@ -45,6 +45,7 @@
         <span class="hud-chip" title="Ngày">📅 <b id="hud-day">1</b></span>
         <span class="hud-chip" title="Cấp độ">⭐ <b id="hud-level">1</b></span>
         <span class="hud-chip" title="Năng lượng">⚡ <b id="hud-energy">100</b></span>
+        <span class="hud-chip" title="Kim cương — tưới nhanh cây & ngủ nhanh">💎 <b id="hud-diamond">0</b></span>
       </div>
       <div class="hud-center">
         <div class="xp-wrap" title="Kinh nghiệm">
@@ -73,6 +74,7 @@
             <button id="btn-sleep-m" class="mbtn">🛏️</button>
             <button id="btn-save-m" class="mbtn">💾</button>
           </div>
+          <button id="btn-diamond-m" class="mbtn mdia">💎<small>Chín cây</small></button>
         </div>
       </div>
 
@@ -94,6 +96,7 @@
         <div class="panel-body">
           <p id="sleep-info" class="muted"></p>
           <button id="btn-sleep-confirm" class="btn btn-primary btn-block">😴 Ngủ &amp; sang ngày mới</button>
+          <button id="btn-sleep-diamond" class="btn btn-block">💎 Ngủ nhanh 1 giây (tốn 1 💎)</button>
         </div>
       </div>
 
@@ -116,6 +119,13 @@
       </div>
 
       <!-- Thông báo lên cấp -->
+      <div id="sleep-overlay" class="sleep-overlay hidden">
+        <div class="sleep-box">
+          <div class="zzz">😴</div>
+          <div>Đang ngủ…</div>
+          <div id="sleep-count" class="sleep-count"></div>
+        </div>
+      </div>
       <div id="levelup-toast" class="levelup hidden">🎉 LÊN CẤP! <span id="levelup-num"></span></div>
       <div id="toast" class="toast hidden"></div>
       <div id="save-indicator" class="save-indicator hidden">💾 Đã lưu</div>
@@ -127,6 +137,7 @@
         <span><b>WASD/⬅⬆⬇➡</b> di chuyển</span>
         <span><b>Space/E</b> dùng công cụ</span>
         <span><b>1–8</b> chọn vật phẩm</span>
+        <span><b>X</b> dùng 💎 cho cây chín ngay</span>
         <span><b>Q</b> túi đồ · <b>B</b> cửa hàng · <b>G</b> xây dựng</span>
       </div>
     </footer>
