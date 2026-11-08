@@ -890,7 +890,9 @@ if (!supabaseConfigured() && loadLocal()) {
 }
 // Vào nhanh chế độ khách qua URL ?#guest
 if (location.hash.includes("guest")) {
-  setTimeout(() => $("auth-guest").click(), 300);
+  const go = () => { const b = $("auth-guest"); if (b && !authScreenVisible()) return; b?.click(); };
+  go();
+  setTimeout(go, 400);
 }
 
 // Handle debug (dùng cho kiểm thử tự động)
