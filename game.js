@@ -825,7 +825,7 @@ window.addEventListener("keydown", (e) => {
   const k = e.key.toLowerCase();
   keys[k] = true;
   if (["arrowup", "arrowdown", "arrowleft", "arrowright", " "].includes(k)) e.preventDefault();
-  if (k >= "1" && k <= "7") {
+  if (k >= "1" && k <= "8") {
     const i = parseInt(k) - 1;
     if (i < TOOLS.length && slotAvailable(i)) { selectedSlot = i; renderToolbar(); }
   }
