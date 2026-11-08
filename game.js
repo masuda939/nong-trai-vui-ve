@@ -897,6 +897,8 @@ window.__farm = {
   get scene() { return scene; },
   get renderer() { return renderer; },
   get player() { return playerGroup; },
+  get camera() { return camera; },
+  renderOnce() { renderer.render(scene, camera); },
 };
 
 /* Âm thanh nhỏ bằng WebAudio */
