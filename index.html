@@ -42,10 +42,7 @@
     <header id="hud">
       <div class="hud-left">
         <span class="hud-chip" title="Vàng">💰 <b id="hud-gold">0</b></span>
-        <span class="hud-chip" title="Ngày">📅 <b id="hud-day">1</b></span>
         <span class="hud-chip" title="Cấp độ">⭐ <b id="hud-level">1</b></span>
-        <span class="hud-chip" title="Năng lượng">⚡ <b id="hud-energy">100</b></span>
-        <span class="hud-chip" title="Kim cương — tưới nhanh cây & ngủ nhanh">💎 <b id="hud-diamond">0</b></span>
       </div>
       <div class="hud-center">
         <div class="xp-wrap" title="Kinh nghiệm">
@@ -54,6 +51,8 @@
         </div>
       </div>
       <div class="hud-right">
+        <span class="hud-chip" title="Năng lượng">⚡ <b id="hud-energy">100</b></span>
+        <span class="hud-chip" title="Kim cương — tưới nhanh cây & ngủ nhanh">💎 <b id="hud-diamond">0</b></span>
         <button id="btn-save" class="btn btn-small" title="Lưu tiến trình (Ctrl+S)">💾</button>
         <button id="btn-logout" class="btn btn-small" title="Đăng xuất">🚪</button>
       </div>
@@ -76,6 +75,12 @@
           </div>
           <button id="btn-diamond-m" class="mbtn mdia">💎<small>Chín cây</small></button>
         </div>
+      </div>
+
+      <!-- Chế độ xây dựng đang bật -->
+      <div id="mode-chip" class="mode-chip hidden">
+        <span id="mode-text"></span>
+        <button id="mode-exit">✕ Thoát</button>
       </div>
 
       <!-- Cửa hàng -->
@@ -136,7 +141,7 @@
       <div class="toolbar-hint">
         <span><b>WASD/⬅⬆⬇➡</b> di chuyển</span>
         <span><b>Space/E</b> dùng công cụ</span>
-        <span><b>1–8</b> chọn vật phẩm</span>
+        <span><b>1–9,0</b> chọn vật phẩm</span>
         <span><b>X</b> dùng 💎 cho cây chín ngay</span>
         <span><b>Q</b> túi đồ · <b>B</b> cửa hàng · <b>G</b> xây dựng</span>
       </div>
