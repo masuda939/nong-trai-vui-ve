@@ -1204,33 +1204,39 @@ function doAction() {
   const k = keyOf(x, y);
   const tool = TOOLS[selectedSlot];
 
-  // Chế độ xây dựng
+  // Chế độ xây dựng — nếu không đặt/gỡ được ở ô này thì tự thoát và làm hành động thường
   if (buildMode) {
     if (buildMode.type === "place") {
-      if (!canPlaceDecor(x, y)) { toast("Chỉ đặt được ngoài ruộng, trên ô trống!"); return; }
       const cost = DECOR[buildMode.id].cost;
-      if (S.gold < cost) { toast("Không đủ vàng!"); setBuildMode(null); return; }
-      S.gold -= cost;
-      S.decor[k] = buildMode.id;
-      syncDecor(); updateHUD(); sfx("buy");
-      if (buildMode.id === "fence") {
-        toast("Đã đặt hàng rào! (tiếp tục bấm Dùng để đặt thêm)");
-      } else {
-        toast("Đã đặt " + DECOR[buildMode.id].name + "!");
-        setBuildMode(null); // kết thúc tự động (trừ hàng rào để nối dài)
+      if (canPlaceDecor(x, y) && S.gold >= cost) {
+        S.gold -= cost;
+        S.decor[k] = buildMode.id;
+        syncDecor(); updateHUD(); sfx("buy");
+        if (buildMode.id === "fence") {
+          toast("Đã đặt hàng rào! (tiếp tục bấm Dùng để đặt thêm)");
+        } else {
+          toast("Đã đặt " + DECOR[buildMode.id].name + "!");
+          setBuildMode(null); // kết thúc tự động (trừ hàng rào để nối dài)
+        }
+        saveGame();
+        return;
       }
-      saveGame();
-      return;
+      // Không đặt được -> thoát chế độ, chạy tiếp hành động thường
+      setBuildMode(null);
+      toast(S.gold < cost ? "Không đủ vàng — đã thoát chế độ đặt" : "Ô này không đặt được — đã thoát chế độ đặt");
     } else if (buildMode.type === "remove") {
       if (S.decor[k]) {
         const refund = Math.floor(DECOR[S.decor[k]].cost / 2);
         S.gold += refund;
         delete S.decor[k];
         syncDecor(); updateHUD(); sfx("sell");
-        toast("Đã thu hồi (+" + refund + "💰) — bấm tiếp để thu hồi ô khác");
+        toast("Đã thu hồi (+" + refund + "💰) — bấm tiếp để gỡ ô khác, ✕ để thoát");
         saveGame();
-      } else toast("Ô này không có trang trí.");
-      return;
+        return;
+      }
+      // Không có gì để gỡ -> thoát chế độ, chạy tiếp hành động thường
+      setBuildMode(null);
+      toast("Không có gì để thu hồi — đã thoát chế độ");
     }
   }
 
