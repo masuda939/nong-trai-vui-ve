@@ -5,6 +5,6 @@
 // Có thể ghi đè bằng biến môi trường Vercel khi build (xem README).
 // ============================================================
 window.SUPABASE_CONFIG = {
-  url: window.__SUPABASE_URL__ || "https://YOUR-PROJECT.supabase.co",
-  anonKey: window.__SUPABASE_ANON_KEY__ || "YOUR-ANON-KEY",
+  url: window.__SUPABASE_URL__ || "https://fewonehaokbylpemznug.supabase.co",
+  anonKey: window.__SUPABASE_ANON_KEY__ || "sb_publishable_N7dXhsSlhWsa15z9s3k8AA_2JGBryqs",
 };
