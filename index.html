@@ -64,6 +64,7 @@
           <div class="mrow">
             <button id="btn-shop-m" class="mbtn">🏪</button>
             <button id="btn-bag-m" class="mbtn">🎒</button>
+            <button id="btn-build-m" class="mbtn">🎍</button>
             <button id="btn-sleep-m" class="mbtn">🛏️</button>
             <button id="btn-save-m" class="mbtn">💾</button>
           </div>
@@ -91,6 +92,24 @@
         </div>
       </div>
 
+      <!-- Ao cá -->
+      <div id="pond-panel" class="panel hidden">
+        <div class="panel-head"><span>🐟 Ao cá</span><button class="panel-close" data-close="pond-panel">✕</button></div>
+        <div id="pond-list" class="panel-body"></div>
+      </div>
+
+      <!-- Chuồng -->
+      <div id="coop-panel" class="panel hidden">
+        <div class="panel-head"><span>🐔 Chuồng nuôi</span><button class="panel-close" data-close="coop-panel">✕</button></div>
+        <div id="coop-list" class="panel-body"></div>
+      </div>
+
+      <!-- Xây dựng -->
+      <div id="build-panel" class="panel hidden">
+        <div class="panel-head"><span>🎍 Xây dựng &amp; trang trí</span><button class="panel-close" data-close="build-panel">✕</button></div>
+        <div id="build-list" class="panel-body"></div>
+      </div>
+
       <!-- Thông báo lên cấp -->
       <div id="levelup-toast" class="levelup hidden">🎉 LÊN CẤP! <span id="levelup-num"></span></div>
       <div id="toast" class="toast hidden"></div>
@@ -103,7 +122,7 @@
         <span><b>WASD/⬅⬆⬇➡</b> di chuyển</span>
         <span><b>Space/E</b> dùng công cụ</span>
         <span><b>1–7</b> chọn vật phẩm</span>
-        <span><b>Q</b> túi đồ · <b>B</b> cửa hàng</span>
+        <span><b>Q</b> túi đồ · <b>B</b> cửa hàng · <b>G</b> xây dựng</span>
       </div>
     </footer>
   </div>

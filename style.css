@@ -129,6 +129,15 @@ body {
 .shop-item .name, .bag-item .name { font-weight: 700; font-size: 14px; }
 .shop-item .desc, .bag-item .desc { font-size: 12px; color: #cfc7b8; }
 .locked { opacity: .5; }
+.section-title {
+  font-weight: 800; font-size: 13px; color: #9fd48a;
+  text-transform: uppercase; letter-spacing: .5px;
+  margin: 6px 0 2px; border-bottom: 1px dashed rgba(255,255,255,.15); padding-bottom: 4px;
+}
+.build-status {
+  background: rgba(126,200,80,.18); border: 1px solid rgba(126,200,80,.5);
+  border-radius: 10px; padding: 10px; font-size: 13px; font-weight: 600;
+}
 
 /* ===== Toolbar ===== */
 #toolbar {
