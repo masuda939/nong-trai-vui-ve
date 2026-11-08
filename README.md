@@ -1,6 +1,6 @@
-# 🌱 Nông Trại Vui Vẻ
+# 🌾 Nông Trại Vui Vẻ 3D
 
-Game nông trại 2D lấy cảm hứng từ **Stardew Valley** — chạy hoàn toàn trên web (HTML/CSS/JS thuần, không cần build).
+Game nông trại 3D (Three.js), hỗ trợ đầy đủ điện thoại (joystick ảo + nút cảm ứng) lấy cảm hứng từ **Stardew Valley** — chạy hoàn toàn trên web (HTML/CSS/JS thuần, không cần build).
 
 ## ✨ Tính năng
 
