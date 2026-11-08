@@ -889,6 +889,16 @@ if (!supabaseConfigured() && loadLocal()) {
   $("cloud-status").textContent = "💾 Có tiến trình đã lưu trên máy này — chọn \"Chơi thử\" để tiếp tục.";
 }
 
+// Handle debug (dùng cho kiểm thử tự động)
+window.__farm = {
+  get state() { return S; },
+  doAction, syncPlots, gainXP, CROPS,
+  get plots() { return plotMeshes; },
+  get scene() { return scene; },
+  get renderer() { return renderer; },
+  get player() { return playerGroup; },
+};
+
 /* Âm thanh nhỏ bằng WebAudio */
 let audioCtx = null;
 function sfx(type) {
