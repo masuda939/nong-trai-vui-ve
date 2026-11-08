@@ -888,6 +888,10 @@ initSupabase();
 if (!supabaseConfigured() && loadLocal()) {
   $("cloud-status").textContent = "💾 Có tiến trình đã lưu trên máy này — chọn \"Chơi thử\" để tiếp tục.";
 }
+// Vào nhanh chế độ khách qua URL ?#guest
+if (location.hash.includes("guest")) {
+  setTimeout(() => $("auth-guest").click(), 300);
+}
 
 // Handle debug (dùng cho kiểm thử tự động)
 window.__farm = {
