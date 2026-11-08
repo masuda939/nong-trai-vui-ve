@@ -771,8 +771,8 @@ function buildSpeciesPlant(holder, id, ready, prog) {
       bud.position.set(0.25, 0.15, 0.15);
       holder.add(bud);
     }
-  } else if (id === "xmas") {
-
+  }
+}
 
 /* ---------- Cá 3D bơi trong ao ---------- */
 const fishMeshes = [];
