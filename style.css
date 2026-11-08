@@ -194,8 +194,15 @@ body {
   .hud-chip { font-size: 12px; padding: 4px 6px; }
   .hud-center { margin: 0 4px; }
   .panel { width: 96%; max-height: 70%; }
-  #joystick { width: 108px; height: 108px; bottom: 14px; left: 14px; }
-  #mobile-buttons { right: 12px; bottom: 14px; }
+  #joystick { width: 96px; height: 96px; bottom: 12px; left: 12px; }
+  #joystick-knob { width: 44px; height: 44px; }
+  #mobile-buttons { right: 10px; bottom: 12px; gap: 8px; }
+  .mbtn { width: 42px; height: 42px; font-size: 17px; }
+  .mbtn small { display: none; }
+  .mbig { width: 64px; height: 64px; font-size: 24px; }
+  .mbig small { display: block; font-size: 9px; }
+  .mrow { gap: 5px; flex-wrap: wrap; justify-content: flex-end; max-width: 56vw; }
+  .toast { bottom: 130px; }
 }
 @media (pointer: fine) and (min-width: 721px) {
   /* Desktop ẩn joystick, vẫn hiện nút nhỏ gọn ở góc phải */

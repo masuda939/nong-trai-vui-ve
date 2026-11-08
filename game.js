@@ -1502,10 +1502,10 @@ function renderFrame(t = performance.now() / 1000) {
 
   const legs = playerGroup.userData.legs, arms = playerGroup.userData.arms;
   if (playerGroup.userData.moving) {
-    const sw = Math.sin(t * 10) * 0.55;
+    const sw = Math.sin(t * 6) * 0.42;
     legs[0].rotation.x = sw;  legs[1].rotation.x = -sw;
-    arms[0].rotation.x = -sw * 0.8; arms[1].rotation.x = sw * 0.8;
-    playerGroup.position.y = Math.abs(Math.sin(t * 10)) * 0.12;
+    arms[0].rotation.x = -sw * 0.75; arms[1].rotation.x = sw * 0.75;
+    playerGroup.position.y = Math.abs(Math.sin(t * 6)) * 0.08;
   } else {
     legs[0].rotation.x = 0; legs[1].rotation.x = 0;
     // Thở nhẹ khi đứng yên
