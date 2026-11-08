@@ -25,7 +25,7 @@ const CROP_IDS = Object.keys(CROPS);
 
 /* Cá trong ao */
 const FISH = {
-  ro:   { name: "Cá Rô",   emoji: "🐟", cost: 60,  sell: 160, days: 3, xp: 12, level: 1, color: 0x6b8f3a },
+  ro:   { name: "Cá Rô",   emoji: "🐟", cost: 60,  sell: 160, days: 3, xp: 12, level: 1, color: 0x9ecb5a },
   carp: { name: "Cá Chép", emoji: "🐠", cost: 140, sell: 400, days: 6, xp: 32, level: 3, color: 0xd9534f },
 };
 const FISH_IDS = Object.keys(FISH);
@@ -360,7 +360,7 @@ function buildGround() {
   mkWall(pw + 0.7, 0.35, cx0, hz1 + 0.175);
   mkWall(0.35, pd, hx0 - 0.175, cz0);
   mkWall(0.35, pd, hx1 + 0.175, cz0);
-  const floor = new THREE.Mesh(new THREE.PlaneGeometry(pw, pd), mat(0x27401f));
+  const floor = new THREE.Mesh(new THREE.PlaneGeometry(pw, pd), mat(0x2e4a26));
   floor.rotation.x = -Math.PI / 2;
   floor.position.set(cx0, -depth + 0.05, cz0);
   scene.add(floor);
@@ -383,7 +383,7 @@ function buildGround() {
   // Mặt nước trong suốt (thấy cá bơi bên dưới) + gợn sóng nhẹ
   waterMesh = new THREE.Mesh(
     new THREE.PlaneGeometry(pw - 0.12, pd - 0.12, 12, 8),
-    new THREE.MeshLambertMaterial({ color: 0x2f7fc4, transparent: true, opacity: 0.5, depthWrite: false })
+    new THREE.MeshLambertMaterial({ color: 0x3a8fd9, transparent: true, opacity: 0.62, depthWrite: false })
   );
   waterMesh.rotation.x = -Math.PI / 2;
   waterMesh.position.set(cx0, -0.38, cz0);
@@ -1545,7 +1545,7 @@ function renderFrame(t = performance.now() / 1000) {
   // Nước ao gợn sóng nhẹ
   if (waterMesh) {
     waterMesh.position.y = -0.38 + Math.sin(t * 1.6) * 0.02;
-    waterMesh.material.opacity = 0.48 + Math.sin(t * 2.2) * 0.05;
+    waterMesh.material.opacity = 0.6 + Math.sin(t * 2.2) * 0.04;
   }
 
   // Cây chín lắc lư
