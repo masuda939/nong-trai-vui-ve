@@ -319,16 +319,18 @@ function makeLabel(text, opts = {}) {
 }
 
 /* Mặt đất có LỖ ao cá (đào sâu thật) */
+let waterMesh = null;
 function buildGround() {
   const GW = COLS * T3 + 30, GH = ROWS * T3 + 30;
   const shape = new THREE.Shape();
   shape.moveTo(-GW / 2, -GH / 2); shape.lineTo(GW / 2, -GH / 2);
   shape.lineTo(GW / 2, GH / 2); shape.lineTo(-GW / 2, GH / 2); shape.closePath();
-  // Lỗ = hình chữ nhật ao (toạ độ world x,z)
+  // Lỗ = hình chữ nhật ao. Lưu ý: ShapeGeometry quay -90° quanh X nên
+  // world z = -shapeY => toạ độ y trong shape phải là -z!
   const hx0 = t2x(POND.x) - T3 / 2, hx1 = t2x(POND.x + POND.w - 1) + T3 / 2;
   const hz0 = t2z(POND.y) - T3 / 2, hz1 = t2z(POND.y + POND.h - 1) + T3 / 2;
   const hole = new THREE.Path();
-  hole.moveTo(hx0, hz0); hole.lineTo(hx1, hz0); hole.lineTo(hx1, hz1); hole.lineTo(hx0, hz1); hole.closePath();
+  hole.moveTo(hx0, -hz0); hole.lineTo(hx1, -hz0); hole.lineTo(hx1, -hz1); hole.lineTo(hx0, -hz1); hole.closePath();
   shape.holes.push(hole);
   const groundGeo = new THREE.ShapeGeometry(shape);
   const ground = new THREE.Mesh(groundGeo, mat(0x6aa84f));
@@ -345,32 +347,55 @@ function buildGround() {
   scene.add(farmPatch);
 
   // Hố ao: thành + đáy (độ sâu thật!)
-  const depth = 1.4;
-  const wallMat = mat(0x4e3a22);
+  const depth = 1.6;
+  const wallMat = mat(0x5c4326);
   const pw = hx1 - hx0, pd = hz1 - hz0;
-  const mkWall = (w, d, x, z, ry) => {
-    const wall = new THREE.Mesh(new THREE.BoxGeometry(w, depth, d), wallMat);
-    wall.position.set(x, -depth / 2 + 0.05, z);
-    if (ry) wall.rotation.y = ry;
+  const cx0 = (hx0 + hx1) / 2, cz0 = (hz0 + hz1) / 2;
+  const mkWall = (w, d, x, z) => {
+    const wall = new THREE.Mesh(new THREE.BoxGeometry(w, depth + 0.2, d), wallMat);
+    wall.position.set(x, -(depth + 0.2) / 2 + 0.12, z);
     scene.add(wall);
   };
-  mkWall(pw + 0.2, 0.2, (hx0 + hx1) / 2, hz0, 0);
-  mkWall(pw + 0.2, 0.2, (hx0 + hx1) / 2, hz1, 0);
-  mkWall(0.2, pd, hx0, (hz0 + hz1) / 2, 0);
-  mkWall(0.2, pd, hx1, (hz0 + hz1) / 2, 0);
-  const floor = new THREE.Mesh(new THREE.PlaneGeometry(pw, pd), mat(0x2f4f2a));
+  mkWall(pw + 0.7, 0.35, cx0, hz0 - 0.175);
+  mkWall(pw + 0.7, 0.35, cx0, hz1 + 0.175);
+  mkWall(0.35, pd, hx0 - 0.175, cz0);
+  mkWall(0.35, pd, hx1 + 0.175, cz0);
+  const floor = new THREE.Mesh(new THREE.PlaneGeometry(pw, pd), mat(0x27401f));
   floor.rotation.x = -Math.PI / 2;
-  floor.position.set((hx0 + hx1) / 2, -depth + 0.05, (hz0 + hz1) / 2);
+  floor.position.set(cx0, -depth + 0.05, cz0);
   scene.add(floor);
 
-  // Mặt nước trong suốt (thấy cá bơi bên dưới)
-  const water = new THREE.Mesh(
-    new THREE.PlaneGeometry(pw - 0.1, pd - 0.1),
-    new THREE.MeshLambertMaterial({ color: 0x2f7fc4, transparent: true, opacity: 0.55, depthWrite: false })
+  // Bờ ao: dải đất quanh mép nước
+  const rimMat = mat(0x8a6a3a);
+  const rim = 0.55;
+  const mkRim = (w, d, x, z) => {
+    const r = new THREE.Mesh(new THREE.PlaneGeometry(w, d), rimMat);
+    r.rotation.x = -Math.PI / 2;
+    r.position.set(x, 0.02, z);
+    r.receiveShadow = true;
+    scene.add(r);
+  };
+  mkRim(pw + rim * 2, rim, cx0, hz0 - rim / 2);
+  mkRim(pw + rim * 2, rim, cx0, hz1 + rim / 2);
+  mkRim(rim, pd, hx0 - rim / 2, cz0);
+  mkRim(rim, pd, hx1 + rim / 2, cz0);
+
+  // Mặt nước trong suốt (thấy cá bơi bên dưới) + gợn sóng nhẹ
+  waterMesh = new THREE.Mesh(
+    new THREE.PlaneGeometry(pw - 0.12, pd - 0.12, 12, 8),
+    new THREE.MeshLambertMaterial({ color: 0x2f7fc4, transparent: true, opacity: 0.5, depthWrite: false })
   );
-  water.rotation.x = -Math.PI / 2;
-  water.position.set((hx0 + hx1) / 2, -0.35, (hz0 + hz1) / 2);
-  scene.add(water);
+  waterMesh.rotation.x = -Math.PI / 2;
+  waterMesh.position.set(cx0, -0.38, cz0);
+  scene.add(waterMesh);
+
+  // Vài tán sen trang trí trên mặt nước
+  for (let i = 0; i < 3; i++) {
+    const pad = new THREE.Mesh(new THREE.CircleGeometry(0.28 + (i % 2) * 0.12, 14), mat(0x3f7a2e));
+    pad.rotation.x = -Math.PI / 2;
+    pad.position.set(cx0 + (i - 1) * 1.7, -0.36, cz0 + (i % 2 ? 0.6 : -0.6));
+    scene.add(pad);
+  }
 }
 
 function buildHouse() {
@@ -1516,6 +1541,12 @@ function renderFrame(t = performance.now() / 1000) {
 
   const ft = facingTile();
   highlightMesh.position.set(t2x(ft.x), 0.06, t2z(ft.y));
+
+  // Nước ao gợn sóng nhẹ
+  if (waterMesh) {
+    waterMesh.position.y = -0.38 + Math.sin(t * 1.6) * 0.02;
+    waterMesh.material.opacity = 0.48 + Math.sin(t * 2.2) * 0.05;
+  }
 
   // Cây chín lắc lư
   for (const [, entry] of plotMeshes) {
