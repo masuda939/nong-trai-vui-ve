@@ -50,6 +50,7 @@ const DECOR = {
   bench:  { name: "Ghế gỗ",   emoji: "🪑", cost: 60 },
   lamp:   { name: "Đèn lồng", emoji: "🏮", cost: 120 },
   tree:   { name: "Cây non",  emoji: "🌳", cost: 200 },
+  xmas:   { name: "Cây thông Noel", emoji: "🎄", cost: 25, currency: "diamond" },
 };
 const DECOR_IDS = Object.keys(DECOR);
 
@@ -702,9 +703,13 @@ function buildSpeciesPlant(holder, id, ready, prog) {
       holder.add(g1);
     }
   } else if (id === "pumpkin") {
-    const vine = new THREE.Mesh(new THREE.SphereGeometry(0.22, 8, 6), M(0x3a6d28));
-    vine.position.set(-0.55, 0.12, 0.3); vine.scale.set(1.6, 0.4, 1);
-    holder.add(vine);
+    // dây leo + mầm lá (luôn hiện rõ từ khi mới gieo)
+    const sprout = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.07, 0.5, 6), M(0x3a6d28));
+    sprout.position.y = 0.28;
+    const leafL = new THREE.Mesh(new THREE.SphereGeometry(0.17, 8, 6), M(0x3a6d28));
+    leafL.position.set(-0.17, 0.5, 0); leafL.scale.set(1.5, 0.5, 1);
+    const leafR = leafL.clone(); leafR.position.x = 0.17;
+    holder.add(sprout, leafL, leafR);
     if (ready) {
       const pumpkin = new THREE.Mesh(new THREE.SphereGeometry(0.55, 14, 10), M(0xe88b1a));
       pumpkin.position.y = 0.42; pumpkin.scale.set(1, 0.75, 1); pumpkin.castShadow = true;
@@ -712,8 +717,8 @@ function buildSpeciesPlant(holder, id, ready, prog) {
       stem.position.y = 0.85;
       holder.add(pumpkin, stem);
     } else {
-      const bud = new THREE.Mesh(new THREE.SphereGeometry(0.14, 8, 6), M(0x7fae3f));
-      bud.position.set(0.2, 0.14, 0);
+      const bud = new THREE.Mesh(new THREE.SphereGeometry(0.13, 8, 6), M(0x7fae3f));
+      bud.position.set(0.25, 0.16, 0.1);
       holder.add(bud);
     }
   } else if (id === "carrot") {
@@ -739,12 +744,16 @@ function buildSpeciesPlant(holder, id, ready, prog) {
       holder.add(s1, s2, s3, lf);
     }
   } else if (id === "watermelon") {
-    // 🍉 Dưa hấu: dây leo + quả to sọc xanh
+    // 🍉 Dưa hấu: dây leo + mầm lá (luôn hiện rõ), quả to sọc khi chín
+    const sprout = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.07, 0.45, 6), M(0x1f6e33));
+    sprout.position.y = 0.25;
+    const sproutLeaf = new THREE.Mesh(new THREE.SphereGeometry(0.18, 8, 6), M(0x2e8b45));
+    sproutLeaf.position.set(0.18, 0.45, 0); sproutLeaf.scale.set(1.4, 0.5, 1);
     const vine = new THREE.Mesh(new THREE.SphereGeometry(0.26, 8, 6), M(0x1f6e33));
     vine.position.set(-0.6, 0.12, 0.25); vine.scale.set(1.8, 0.4, 1);
     const leafBig = new THREE.Mesh(new THREE.SphereGeometry(0.22, 8, 6), M(0x2e8b45));
     leafBig.position.set(0.35, 0.1, -0.3); leafBig.scale.set(1.3, 0.5, 1);
-    holder.add(vine, leafBig);
+    holder.add(sprout, sproutLeaf, vine, leafBig);
     if (ready) {
       const melon = new THREE.Mesh(new THREE.SphereGeometry(0.6, 14, 10), M(0x2e8b3c));
       melon.position.y = 0.48; melon.scale.set(1, 0.82, 1); melon.castShadow = true;
@@ -762,8 +771,7 @@ function buildSpeciesPlant(holder, id, ready, prog) {
       bud.position.set(0.25, 0.15, 0.15);
       holder.add(bud);
     }
-  }
-}
+  } else if (id === "xmas") {
 
 
 /* ---------- Cá 3D bơi trong ao ---------- */
@@ -1044,6 +1052,35 @@ function buildDecorMesh(id) {
     const c2 = new THREE.Mesh(new THREE.SphereGeometry(0.38, 10, 8), M(0x5da23f));
     c2.position.set(0.3, 1.75, 0.1);
     g.add(trunk, c1, c2);
+  } else if (id === "xmas") {
+    // 🎄 Cây thông Noel TO: 3 tầng lá thông + quài màu + sao vàng phát sáng
+    const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.26, 0.9, 8), M(0x6e4a1f));
+    trunk.position.y = 0.45; trunk.castShadow = true;
+    g.add(trunk);
+    const tiers = [
+      { r: 1.55, h: 1.5, y: 1.35 },
+      { r: 1.15, h: 1.3, y: 2.5 },
+      { r: 0.78, h: 1.1, y: 3.5 },
+    ];
+    tiers.forEach((t) => {
+      const cone = new THREE.Mesh(new THREE.ConeGeometry(t.r, t.h, 10), M(0x1f6e33));
+      cone.position.y = t.y; cone.castShadow = true;
+      g.add(cone);
+    });
+    // Quài trang trí quanh cây
+    const cols = [0xe04b3a, 0xf5c542, 0x6fb1e8, 0xff8fb5];
+    for (let i = 0; i < 9; i++) {
+      const tier = tiers[i % 3];
+      const ang = (i / 9) * Math.PI * 2 + 0.4;
+      const rr = tier.r * 0.62;
+      const ball = new THREE.Mesh(new THREE.SphereGeometry(0.11, 8, 6), M(cols[i % cols.length]));
+      ball.position.set(Math.cos(ang) * rr, tier.y + (i % 2) * 0.25, Math.sin(ang) * rr);
+      g.add(ball);
+    }
+    // Sao vàng trên đỉnh
+    const star = new THREE.Mesh(new THREE.OctahedronGeometry(0.26), new THREE.MeshLambertMaterial({ color: 0xffd54a, emissive: 0xffc020, emissiveIntensity: 1 }));
+    star.position.y = 4.35;
+    g.add(star);
   }
   return g;
 }
@@ -1206,10 +1243,13 @@ function doAction() {
 
   // Chế độ xây dựng — nếu không đặt/gỡ được ở ô này thì tự thoát và làm hành động thường
   if (buildMode) {
+    const dDef = DECOR[buildMode.type === "place" ? buildMode.id : "fence"];
+    const useDiamonds = buildMode.type === "place" && DECOR[buildMode.id]?.currency === "diamond";
     if (buildMode.type === "place") {
       const cost = DECOR[buildMode.id].cost;
-      if (canPlaceDecor(x, y) && S.gold >= cost) {
-        S.gold -= cost;
+      const have = useDiamonds ? (S.diamonds || 0) : S.gold;
+      if (canPlaceDecor(x, y) && have >= cost) {
+        if (useDiamonds) S.diamonds -= cost; else S.gold -= cost;
         S.decor[k] = buildMode.id;
         syncDecor(); updateHUD(); sfx("buy");
         if (buildMode.id === "fence") {
@@ -1223,14 +1263,16 @@ function doAction() {
       }
       // Không đặt được -> thoát chế độ, chạy tiếp hành động thường
       setBuildMode(null);
-      toast(S.gold < cost ? "Không đủ vàng — đã thoát chế độ đặt" : "Ô này không đặt được — đã thoát chế độ đặt");
+      toast(have < cost ? (useDiamonds ? "Không đủ 💎 — đã thoát chế độ đặt" : "Không đủ vàng — đã thoát chế độ đặt") : "Ô này không đặt được — đã thoát chế độ đặt");
     } else if (buildMode.type === "remove") {
       if (S.decor[k]) {
-        const refund = Math.floor(DECOR[S.decor[k]].cost / 2);
-        S.gold += refund;
+        const removed = DECOR[S.decor[k]];
+        const isDia = removed?.currency === "diamond";
+        const refund = Math.floor((removed?.cost || 0) / 2);
+        if (isDia) S.diamonds = (S.diamonds || 0) + refund; else S.gold += refund;
         delete S.decor[k];
         syncDecor(); updateHUD(); sfx("sell");
-        toast("Đã thu hồi (+" + refund + "💰) — bấm tiếp để gỡ ô khác, ✕ để thoát");
+        toast("Đã thu hồi (+" + refund + (isDia ? "💎) — bấm tiếp để gỡ ô khác, ✕ để thoát" : "💰) — bấm tiếp để gỡ ô khác, ✕ để thoát"));
         saveGame();
         return;
       }
@@ -1472,12 +1514,13 @@ function renderShop() {
     list.appendChild(shopRow(a.emoji, a.name, `cho ${a.produceEmoji} mỗi ngày (khi được cho ăn) · bán ${a.produceEmoji} ${a.sell}💰 · đang có ${count}/${a.max}${locked ? " · 🔒 Lv." + a.level : ""}`, a.cost, locked || full, () => buyAnimal(id), full ? "Chuồng đầy!" : null));
   });
 }
-function shopRow(emoji, name, desc, cost, disabled, onBuy, note) {
+function shopRow(emoji, name, desc, cost, disabled, onBuy, note, currency) {
+  const cur = currency === "diamond" ? "💎" : "💰";
   const row = document.createElement("div");
   row.className = "shop-item" + (disabled ? " locked" : "");
   row.innerHTML = `<span class="item-emoji">${emoji}</span>
     <div class="grow"><div class="name">${name}</div><div class="desc">${desc}${note ? " · <b style='color:#ffb0a0'>" + note + "</b>" : ""}</div></div>
-    <button class="btn btn-small" ${disabled ? "disabled" : ""}>${cost}💰</button>`;
+    <button class="btn btn-small" ${disabled ? "disabled" : ""}>${cost}${cur}</button>`;
   if (!disabled) row.querySelector("button").onclick = onBuy;
   return row;
 }
@@ -1674,11 +1717,13 @@ function renderBuild() {
   list.appendChild(sectionTitle("🛒 Mua & đặt (đặt nhiều lần, mỗi lần trừ tiền)"));
   DECOR_IDS.forEach((id) => {
     const d = DECOR[id];
-    list.appendChild(shopRow(d.emoji, d.name, `giá ${d.cost}💰 · thu hồi hoàn lại 50%`, d.cost, S.gold < d.cost, () => {
+    const isDia = d.currency === "diamond";
+    const afford = isDia ? (S.diamonds || 0) >= d.cost : S.gold >= d.cost;
+    list.appendChild(shopRow(d.emoji, d.name, isDia ? `giá ${d.cost}💎 (kim cương) · thu hồi hoàn lại 50%` : `giá ${d.cost}💰 · thu hồi hoàn lại 50%`, d.cost, !afford, () => {
       setBuildMode({ type: "place", id });
       closePanels();
       toast("Đi tới ô trống rồi bấm Dùng ✋ để đặt " + d.name);
-    }));
+    }, null, d.currency));
   });
   list.appendChild(sectionTitle("🧹 Thu hồi"));
   const rm = document.createElement("button");
